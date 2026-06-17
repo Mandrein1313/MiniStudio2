@@ -32,6 +32,18 @@ import java.io.IOException;
 
 import com.getbase.floatingactionbutton.FloatingActionButton;
 import com.getbase.floatingactionbutton.FloatingActionsMenu;
+import java.net.URL;
+import java.io.InputStream;
+
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.widget.Button;
+import android.widget.Spinner;
+import android.graphics.drawable.GradientDrawable;
+// และอย่าลืมเพิ่มตัวที่เหลือถ้าโปรแกรมแจ้งเตือนนะครับ
+
 
 public class ProjectListActivity extends AppCompatActivity {
 
@@ -125,10 +137,29 @@ public class ProjectListActivity extends AppCompatActivity {
         });
     }
 
-    private void importFromGitHub() {
-        // TODO: น้าใส่โค้ดสำหรับดึงโปรเจกต์จาก GitHub ไว้ที่นี่ครับ
-        Toast.makeText(this, "ฟังก์ชันนำเข้าจาก GitHub กำลังพัฒนา...", Toast.LENGTH_SHORT).show();
-    }
+private void importFromGitHub() {
+    // 1. สร้างช่องให้ผู้ใช้ใส่ URL
+    final EditText etUrl = new EditText(this);
+    etUrl.setHint("วางลิงก์ GitHub (เช่น https://github.com/user/repo)");
+    etUrl.setPadding(30, 30, 30, 30);
+
+    new AlertDialog.Builder(this)
+        .setTitle("นำเข้าโปรเจกต์จาก GitHub")
+        .setView(etUrl)
+        .setPositiveButton("ดาวน์โหลด", (dialog, which) -> {
+            String url = etUrl.getText().toString().trim();
+            if (url.isEmpty()) {
+                Toast.makeText(this, "กรุณาใส่ลิงก์ก่อนครับ", Toast.LENGTH_SHORT).show();
+            } else {
+                // สมมติชื่อโปรเจกต์จากชื่อ repo หรือให้ผู้ใช้ตั้งเอง
+                String projectName = "Import_" + System.currentTimeMillis();
+                downloadAndImportProject(url, projectName);
+            }
+        })
+        .setNegativeButton("ยกเลิก", null)
+        .show();
+}
+
 
     // --- เมธอดส่วนที่เหลือคงเดิม ---
     private void refreshProjectList() {
@@ -722,6 +753,43 @@ public class ProjectListActivity extends AppCompatActivity {
 
         dialog.show();
     }
+    
+    private void downloadAndImportProject(String repoUrl, String projectName) {
+    // URL ของ GitHub จะต้องต่อท้ายด้วย /archive/refs/heads/master.zip
+    String zipUrl = repoUrl.endsWith("/") ? repoUrl + "archive/refs/heads/master.zip" : repoUrl + "/archive/refs/heads/master.zip";
+    File targetDir = new File("/sdcard/MiniStudio/" + projectName);
+    File zipFile = new File(getCacheDir(), "temp.zip");
+
+    new Thread(() -> {
+        try {
+            // 1. ดาวน์โหลดไฟล์
+            URL url = new URL(zipUrl);
+            InputStream is = url.openStream();
+            FileOutputStream fos = new FileOutputStream(zipFile);
+            byte[] buffer = new byte[1024];
+            int len;
+            while ((len = is.read(buffer)) > 0) fos.write(buffer, 0, len);
+            fos.close();
+            is.close();
+
+            // 2. แตกไฟล์
+            targetDir.mkdirs();
+            GitHubDownloader.unzip(zipFile, targetDir);
+
+            // 3. ปรับปรุงหน้าจอ (ต้องทำใน UI Thread)
+            runOnUiThread(() -> {
+                refreshProjectList();
+                adapter.notifyDataSetChanged();
+                Toast.makeText(this, "นำเข้าโปรเจกต์สำเร็จ!", Toast.LENGTH_SHORT).show();
+            });
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            runOnUiThread(() -> Toast.makeText(this, "ผิดพลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
+        }
+    }).start();
+}
+
     
 
 }
