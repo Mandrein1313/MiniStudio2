@@ -41,7 +41,6 @@ public class ProjectListActivity extends AppCompatActivity {
     private FloatingActionsMenu fabMenu;
     private FloatingActionButton fabCreate;
     private FloatingActionButton fabGithub;
-    private Uri selectedIconUri = null; 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -326,22 +325,6 @@ public class ProjectListActivity extends AppCompatActivity {
         spinMinSdk.setAdapter(sdkAdapter);
         spinMinSdk.setSelection(1); // เลือก API 23 เป็นค่าเริ่มต้นตามสไตล์ IDE ทั่วไป
         mainLayout.addView(spinMinSdk, boxParams);
-        
-        // เพิ่มในส่วนที่สร้าง Layout ของ dialog
-final EditText etIconName = new EditText(this);
-etIconName.setHint("ชื่อไอคอน (เช่น my_icon.png)");
-// ... (ตั้งค่า Style etIconName ให้เหมือนช่องอื่นๆ) ...
-mainLayout.addView(etIconName, boxParams);
-
-android.widget.Button btnPickIcon = new android.widget.Button(this);
-btnPickIcon.setText("เลือกรูปไอคอน");
-btnPickIcon.setOnClickListener(v -> {
-    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-    intent.setType("image/*");
-    startActivityForResult(intent, 102); // 102 คือ requestCode สำหรับเลือกไอคอน
-});
-mainLayout.addView(btnPickIcon, boxParams);
-
 
 
         final androidx.appcompat.app.AlertDialog dialog = builder.setView(mainLayout).create();
@@ -418,16 +401,6 @@ mainLayout.addView(btnPickIcon, boxParams);
 
         dialog.show();
     }
-
-@Override
-protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-    super.onActivityResult(requestCode, resultCode, data);
-    if (requestCode == 102 && resultCode == RESULT_OK && data != null) {
-        selectedIconUri = data.getData();
-        Toast.makeText(this, "เลือกรูปไอคอนสำเร็จ!", Toast.LENGTH_SHORT).show();
-    }
-}
-
 
     // 🌟 เมธอดเวอร์ชันอัปเกรด: รับค่าตัวแปรภาษาและ SDK มาจำแนกเขียนโค้ดและสร้างโฟลเดอร์จริง
     // 🌟 เมธอดเวอร์ชันอัปเกรด: รับค่าตัวแปรภาษาและ SDK มาจำแนกเขียนโค้ดและสร้างโฟลเดอร์จริง
