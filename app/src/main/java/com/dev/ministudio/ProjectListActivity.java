@@ -554,17 +554,18 @@ private void importFromGitHub() {
         }
     }
 
-    private void deleteRecursive(File fileOrDirectory) {
-        if (fileOrDirectory.isDirectory()) {
-            File[] children = fileOrDirectory.listFiles();
-            if (children != null) {
-                for (File child : children) {
-                    deleteRecursive(child);
-                }
+ private void deleteRecursive(File fileOrDirectory) {
+    if (fileOrDirectory.isDirectory()) {
+        File[] children = fileOrDirectory.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteRecursive(child);
             }
         }
-        fileOrDirectory.delete();
     }
+    fileOrDirectory.delete();
+}
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -832,17 +833,6 @@ private boolean isUnwanted(String name) {
 }
 
 // ลบไฟล์หรือโฟลเดอร์แบบ Recursive (ต้องเช็ค null ด้วย)
-private void deleteRecursive(File fileOrDirectory) {
-    if (fileOrDirectory.isDirectory()) {
-        File[] children = fileOrDirectory.listFiles();
-        if (children != null) {
-            for (File child : children) {
-                deleteRecursive(child);
-            }
-        }
-    }
-    fileOrDirectory.delete();
-}
 
 
 }
