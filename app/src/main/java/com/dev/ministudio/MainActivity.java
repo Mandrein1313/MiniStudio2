@@ -54,9 +54,6 @@ import android.content.Intent;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import androidx.viewpager2.widget.ViewPager2;
-import android.app.AlertDialog;
-import android.widget.GridView;
-// ถ้ายังไม่มี IconAdapter และ IconManager ก็สร้างไฟล์แยกขึ้นมาด้วยนะครับ
 
 
 public class MainActivity extends AppCompatActivity {
@@ -958,13 +955,6 @@ private void updateAiOutput(String markdownText) {
             return true;
         }
         
-       // ตัวอย่าง: ถ้ากดจากเมนู Toolbar
-if (id == R.id.action_change_icon) { 
-    showIconPickerDialog(); 
-    return true; 
-}
-
-        
         if (id == R.id.action_search) {
             searchBar.setVisibility(searchBar.getVisibility() == View.GONE ? View.VISIBLE : View.GONE);
             return true;
@@ -1144,35 +1134,6 @@ public void jumpToErrorLocation(String fileName, int lineNumber) {
         }
     });
 }
-
-private void showIconPickerDialog() {
-    // ดึงรายการ Path ของไอคอน (ฟังก์ชันนี้ต้องเขียนใน IconManager ให้ return List<String>)
-    List<String> myIconPaths = IconManager.getAllIconPaths(this); 
-
-    GridView gridView = new GridView(this);
-    gridView.setNumColumns(5);
-    gridView.setPadding(16, 16, 16, 16);
-    
-    // ตรงนี้ต้องส่ง myIconPaths (List<String>) เข้าไปแทน
-    gridView.setAdapter(new IconAdapter(this, myIconPaths)); 
-
-    AlertDialog.Builder builder = new AlertDialog.Builder(this);
-    builder.setTitle("เลือกไอคอนแอป");
-    builder.setView(gridView);
-    AlertDialog dialog = builder.create();
-
-    gridView.setOnItemClickListener((parent, view, position, id) -> {
-        String selectedPath = myIconPaths.get(position);
-        // บันทึก Path ของไอคอนที่เลือกแทนการบันทึก ID
-        IconManager.saveSelectedIconPath(this, selectedPath); 
-        
-        dialog.dismiss();
-        showToast("เปลี่ยนไอคอนเรียบร้อย!");
-    });
-
-    dialog.show();
-}
-
 
 
 }
