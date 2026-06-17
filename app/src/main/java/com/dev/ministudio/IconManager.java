@@ -2,36 +2,45 @@ package com.dev.ministudio;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import java.lang.reflect.Field;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
 public class IconManager {
 
-    // ฟังก์ชันนี้จะ "สแกน" หาไฟล์ใน drawable ที่ขึ้นต้นด้วย "ic_"
-    public static List<Integer> getAllIconIds(Context context) {
-        List<Integer> iconIds = new ArrayList<>();
-        Field[] drawables = R.drawable.class.getFields();
-
-        for (Field f : drawables) {
-            try {
-                // เช็คว่าชื่อไฟล์ขึ้นต้นด้วย "ic_" หรือไม่
-                if (f.getName().startsWith("ic_")) {
-                    int resId = f.getInt(null);
-                    iconIds.add(resId);
+    // 1. เปลี่ยนมาสแกนไฟล์จากโฟลเดอร์ในเครื่องแทนการดึงจาก R.drawable
+    public static List<String> getAllIconPaths(Context context) {
+        List<String> iconPaths = new ArrayList<>();
+        
+        // สมมติว่าน้าเก็บไอคอนที่แตกมาไว้ในโฟลเดอร์นี้
+        File iconFolder = new File(context.getExternalFilesDir(null), "icons");
+        
+        if (iconFolder.exists() && iconFolder.isDirectory()) {
+            File[] files = iconFolder.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    // กรองเอาเฉพาะไฟล์ .png หรือ .jpg
+                    if (file.getName().endsWith(".png") || file.getName().endsWith(".jpg")) {
+                        iconPaths.add(file.getAbsolutePath());
+                    }
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
         }
-        return iconIds;
+        return iconPaths;
     }
 
     private static final String PREFS_NAME = "AppPrefs";
-    private static final String KEY_SELECTED_ICON = "selected_icon";
+    private static final String KEY_SELECTED_ICON_PATH = "selected_icon_path";
 
-    public static void saveSelectedIcon(Context context, int resId) {
+    // 2. เปลี่ยนจากการเก็บ int resId มาเป็น String path
+    public static void saveSelectedIconPath(Context context, String path) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-               .edit().putInt(KEY_SELECTED_ICON, resId).apply();
+               .edit().putString(KEY_SELECTED_ICON_PATH, path).apply();
+    }
+
+    // ฟังก์ชันสำหรับดึงค่า Path ที่บันทึกไว้ไปใช้งาน
+    public static String getSelectedIconPath(Context context) {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                      .getString(KEY_SELECTED_ICON_PATH, null);
     }
 }

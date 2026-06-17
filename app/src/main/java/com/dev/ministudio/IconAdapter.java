@@ -1,6 +1,7 @@
 package com.dev.ministudio;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
@@ -10,22 +11,22 @@ import java.util.List;
 
 public class IconAdapter extends BaseAdapter {
     private Context context;
-    private List<Integer> iconList; // เปลี่ยนจาก int[] เป็น List<Integer>
+    private List<String> iconPathList; // เปลี่ยนเป็น List<String> เพื่อเก็บ Path ของไฟล์
 
-    // Constructor รับค่า List
-    public IconAdapter(Context context, List<Integer> iconList) {
+    // Constructor รับค่า List ของ Path ไฟล์
+    public IconAdapter(Context context, List<String> iconPathList) {
         this.context = context;
-        this.iconList = iconList;
+        this.iconPathList = iconPathList;
     }
 
     @Override 
     public int getCount() { 
-        return iconList.size(); // ใช้ .size() สำหรับ List
+        return iconPathList.size(); 
     }
 
     @Override 
     public Object getItem(int position) { 
-        return iconList.get(position); // ใช้ .get() สำหรับ List
+        return iconPathList.get(position); 
     }
 
     @Override 
@@ -46,8 +47,14 @@ public class IconAdapter extends BaseAdapter {
             imageView = (ImageView) convertView;
         }
         
-        // ดึงไอคอนจากตำแหน่งที่ต้องการ
-        imageView.setImageResource(iconList.get(position));
+        // ดึง Path ของไฟล์จากตำแหน่งที่ต้องการ
+        String path = iconPathList.get(position);
+        
+        // โหลดรูปจาก Path โดยตรง
+        if (path != null) {
+            imageView.setImageDrawable(Drawable.createFromPath(path));
+        }
+        
         return imageView;
     }
 }

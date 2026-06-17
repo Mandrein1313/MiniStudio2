@@ -1145,16 +1145,16 @@ public void jumpToErrorLocation(String fileName, int lineNumber) {
     });
 }
 
-// ใน Activity ของน้า
 private void showIconPickerDialog() {
-    // 1. ดึงรายการไอคอนแบบออโต้จากโฟลเดอร์ drawable
-    List<Integer> myIcons = IconManager.getAllIconIds(this);
+    // ดึงรายการ Path ของไอคอน (ฟังก์ชันนี้ต้องเขียนใน IconManager ให้ return List<String>)
+    List<String> myIconPaths = IconManager.getAllIconPaths(this); 
 
     GridView gridView = new GridView(this);
-    gridView.setNumColumns(5); // ปรับจำนวนคอลัมน์ตามชอบ
+    gridView.setNumColumns(5);
+    gridView.setPadding(16, 16, 16, 16);
     
-    // 2. ใช้ Adapter ของน้า (ต้องแน่ใจว่า Adapter รับ List<Integer> ได้)
-    gridView.setAdapter(new IconAdapter(this, myIcons)); 
+    // ตรงนี้ต้องส่ง myIconPaths (List<String>) เข้าไปแทน
+    gridView.setAdapter(new IconAdapter(this, myIconPaths)); 
 
     AlertDialog.Builder builder = new AlertDialog.Builder(this);
     builder.setTitle("เลือกไอคอนแอป");
@@ -1162,17 +1162,17 @@ private void showIconPickerDialog() {
     AlertDialog dialog = builder.create();
 
     gridView.setOnItemClickListener((parent, view, position, id) -> {
-        // ดึงไอคอนจาก List ที่เราดึงมาเมื่อกี้
-        int selectedIconResId = myIcons.get(position);
-        
-        IconManager.saveSelectedIcon(this, selectedIconResId); 
+        String selectedPath = myIconPaths.get(position);
+        // บันทึก Path ของไอคอนที่เลือกแทนการบันทึก ID
+        IconManager.saveSelectedIconPath(this, selectedPath); 
         
         dialog.dismiss();
-        Toast.makeText(this, "เปลี่ยนไอคอนเรียบร้อย!", Toast.LENGTH_SHORT).show();
+        showToast("เปลี่ยนไอคอนเรียบร้อย!");
     });
 
     dialog.show();
 }
+
 
 
 }
