@@ -755,13 +755,10 @@ private void importFromGitHub() {
     
 private void downloadAndImportProject(String repoUrl, String projectName) {
     // 1. จัดการ URL: ลบ .git ออก และลบ / ท้ายสุดออก
-    String cleanUrl = repoUrl.replace(".git", "");
-    if (cleanUrl.endsWith("/")) {
-        cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
-    }
+    final String cleanUrl = repoUrl.replace(".git", ""); // ต้องเป็น final เพื่อใช้ใน Lambda
+    final String finalCleanUrl = cleanUrl.endsWith("/") ? cleanUrl.substring(0, cleanUrl.length() - 1) : cleanUrl;
 
-    // 2. ลองเดา Branch: ตรวจสอบทั้ง master และ main
-    // เราจะสร้าง Thread ที่ลองดาวน์โหลดจาก master ก่อน ถ้าไม่ได้ค่อยลอง main
+    // 2. ใช้ Thread
     new Thread(() -> {
         try {
             String[] branches = {"master", "main"};
@@ -769,8 +766,11 @@ private void downloadAndImportProject(String repoUrl, String projectName) {
             File zipFile = new File(getCacheDir(), "temp.zip");
             File targetDir = new File("/sdcard/MiniStudio/" + projectName);
 
-            for (String branch : branches) {
-                String zipUrl = cleanUrl + "/archive/refs/heads/" + branch + ".zip";
+            for (String b : branches) {
+                // สร้างตัวแปร final ภายในลูปเพื่อใช้ใน Lambda ของ attemptDownload หรือที่เกี่ยวข้อง
+                final String branch = b; 
+                String zipUrl = finalCleanUrl + "/archive/refs/heads/" + branch + ".zip";
+                
                 if (attemptDownload(zipUrl, zipFile)) {
                     success = true;
                     break;
@@ -784,8 +784,6 @@ private void downloadAndImportProject(String repoUrl, String projectName) {
             // 3. แตกไฟล์
             targetDir.mkdirs();
             GitHubDownloader.unzip(zipFile, targetDir);
-
-            // [โค้ดส่วนการจัดโฟลเดอร์/ลบขยะ ต่อจากที่คุยกันรอบก่อนหน้า...]
             
             runOnUiThread(() -> Toast.makeText(this, "นำเข้าสำเร็จ!", Toast.LENGTH_SHORT).show());
 
