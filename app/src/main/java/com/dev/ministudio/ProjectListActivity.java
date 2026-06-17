@@ -137,31 +137,32 @@ public class ProjectListActivity extends AppCompatActivity {
         });
     }
 
-private void importFromGitHub() {
-    // 1. สร้างช่องให้ผู้ใช้ใส่ URL
-    final EditText etUrl = new EditText(this);
-    etUrl.setHint("วางลิงก์ GitHub (เช่น https://github.com/user/repo)");
-    etUrl.setPadding(30, 30, 30, 30);
+private void downloadAndImportProject(String url, String projectName) {
+    // 1. สร้างโฟลเดอร์สำหรับเก็บโปรเจกต์ใหม่
+    File targetDir = new File(getExternalFilesDir(null), "Projects/" + projectName);
+    if (!targetDir.exists()) {
+        targetDir.mkdirs();
+    }
 
-    new AlertDialog.Builder(this)
-        .setTitle("นำเข้าโปรเจกต์จาก GitHub")
-        .setView(etUrl)
-        .setPositiveButton("ดาวน์โหลด", (dialog, which) -> {
-            String url = etUrl.getText().toString().trim();
-            if (url.isEmpty()) {
-                Toast.makeText(this, "กรุณาใส่ลิงก์ก่อนครับ", Toast.LENGTH_SHORT).show();
-            } else {
-                // สมมติชื่อโปรเจกต์จากชื่อ repo หรือให้ผู้ใช้ตั้งเอง
-                String projectName = "Import_" + System.currentTimeMillis();
-                downloadAndImportProject(url, projectName);
-            }
-        })
-        .setNegativeButton("ยกเลิก", null)
-        .show();
+    // 2. แปลง URL ให้เป็นลิงก์ดาวน์โหลด .zip ของ GitHub
+    // ปกติลิงก์จะเป็น https://github.com/user/repo ก็ต้องแปลงเป็น .../repo/archive/refs/heads/main.zip
+    String zipUrl = url.endsWith(".git") ? url.substring(0, url.length() - 4) : url;
+    zipUrl += "/archive/refs/heads/main.zip";
+
+    // 3. ใช้ GitHubManager ที่เราสร้างไว้ดาวน์โหลด
+    GitHubManager manager = new GitHubManager();
+    
+    Toast.makeText(this, "กำลังดาวน์โหลด...", Toast.LENGTH_SHORT).show();
+
+    manager.downloadRepo(zipUrl, targetDir, () -> {
+        // เมื่อดาวน์โหลดและแตกไฟล์เสร็จแล้ว
+        Toast.makeText(this, "นำเข้าโปรเจกต์สำเร็จ!", Toast.LENGTH_SHORT).show();
+        
+        // ตรงนี้ให้น้าเขียนโค้ดสำหรับรีเฟรชหน้าจอ (เช่น โหลด List ขึ้นมาใหม่)
+        // loadProjectList(); 
+    });
 }
-
-
-    // --- เมธอดส่วนที่เหลือคงเดิม ---
+  // --- เมธอดส่วนที่เหลือคงเดิม ---
     private void refreshProjectList() {
         projects.clear();
         File root = new File("/sdcard/MiniStudio");
