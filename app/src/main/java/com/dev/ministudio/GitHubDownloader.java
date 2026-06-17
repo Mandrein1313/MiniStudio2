@@ -1,3 +1,5 @@
+package com.dev.ministudio;
+
 import java.io.*;
 import java.net.URL;
 import java.util.zip.*;
