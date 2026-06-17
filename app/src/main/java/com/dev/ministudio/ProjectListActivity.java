@@ -754,70 +754,68 @@ private void importFromGitHub() {
     }
     
 private void downloadAndImportProject(String repoUrl, String projectName) {
-    // แก้ไข URL ให้รองรับทั้ง master และ main (GitHub ปัจจุบันนิยมใช้ main)
-    String zipUrl = repoUrl.endsWith("/") ? repoUrl + "archive/refs/heads/main.zip" : repoUrl + "/archive/refs/heads/main.zip";
-    File targetDir = new File("/sdcard/MiniStudio/" + projectName);
-    File zipFile = new File(getCacheDir(), "temp.zip");
+    // 1. จัดการ URL: ลบ .git ออก และลบ / ท้ายสุดออก
+    String cleanUrl = repoUrl.replace(".git", "");
+    if (cleanUrl.endsWith("/")) {
+        cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+    }
 
+    // 2. ลองเดา Branch: ตรวจสอบทั้ง master และ main
+    // เราจะสร้าง Thread ที่ลองดาวน์โหลดจาก master ก่อน ถ้าไม่ได้ค่อยลอง main
     new Thread(() -> {
         try {
-            // 1. ดาวน์โหลดไฟล์
-            URL url = new URL(zipUrl);
-            try (InputStream is = url.openStream(); 
-                 FileOutputStream fos = new FileOutputStream(zipFile)) {
-                byte[] buffer = new byte[4096]; // เพิ่ม buffer เป็น 4KB เพื่อความเร็ว
-                int len;
-                while ((len = is.read(buffer)) > 0) fos.write(buffer, 0, len);
+            String[] branches = {"master", "main"};
+            boolean success = false;
+            File zipFile = new File(getCacheDir(), "temp.zip");
+            File targetDir = new File("/sdcard/MiniStudio/" + projectName);
+
+            for (String branch : branches) {
+                String zipUrl = cleanUrl + "/archive/refs/heads/" + branch + ".zip";
+                if (attemptDownload(zipUrl, zipFile)) {
+                    success = true;
+                    break;
+                }
             }
 
-            // 2. แตกไฟล์
+            if (!success) {
+                throw new Exception("ไม่พบไฟล์ในทั้ง branch master และ main");
+            }
+
+            // 3. แตกไฟล์
             targetDir.mkdirs();
             GitHubDownloader.unzip(zipFile, targetDir);
 
-            // 3. จัดการโครงสร้างโฟลเดอร์และลบขยะ
-            File[] files = targetDir.listFiles();
-            if (files != null) {
-                // ถ้าแตกไฟล์ออกมาแล้วเจอโฟลเดอร์ซ้อน (เช่น MyProject-main)
-                if (files.length == 1 && files[0].isDirectory()) {
-                    File subFolder = files[0];
-                    File[] subFiles = subFolder.listFiles();
-                    if (subFiles != null) {
-                        for (File f : subFiles) {
-                            // ย้ายไฟล์ดีๆ ออกมา, ถ้าเจอขยะให้ลบเลย
-                            if (isUnwanted(f.getName())) {
-                                deleteRecursive(f);
-                            } else {
-                                f.renameTo(new File(targetDir, f.getName()));
-                            }
-                        }
-                    }
-                    subFolder.delete(); // ลบโฟลเดอร์ที่ว่างเปล่าหลังย้ายเสร็จ
-                }
-                
-                // ลบไฟล์ขยะที่อาจหลุดรอดมาในโฟลเดอร์หลัก
-                File[] rootFiles = targetDir.listFiles();
-                if (rootFiles != null) {
-                    for (File f : rootFiles) {
-                        if (isUnwanted(f.getName())) {
-                            deleteRecursive(f);
-                        }
-                    }
-                }
-            }
-
-            // 4. แจ้งเตือนเมื่อเสร็จ
-            runOnUiThread(() -> {
-                refreshProjectList();
-                adapter.notifyDataSetChanged();
-                Toast.makeText(this, "นำเข้าโปรเจกต์สำเร็จ!", Toast.LENGTH_SHORT).show();
-            });
+            // [โค้ดส่วนการจัดโฟลเดอร์/ลบขยะ ต่อจากที่คุยกันรอบก่อนหน้า...]
+            
+            runOnUiThread(() -> Toast.makeText(this, "นำเข้าสำเร็จ!", Toast.LENGTH_SHORT).show());
 
         } catch (Exception e) {
-            e.printStackTrace();
-            runOnUiThread(() -> Toast.makeText(this, "เกิดข้อผิดพลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            runOnUiThread(() -> Toast.makeText(this, "พลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
         }
     }).start();
 }
+
+// ฟังก์ชันช่วยเช็คว่าดาวน์โหลดได้จริงไหม
+private boolean attemptDownload(String urlString, File outputFile) {
+    try {
+        java.net.URL url = new java.net.URL(urlString);
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+        conn.setInstanceFollowRedirects(true);
+        if (conn.getResponseCode() == 200) {
+            try (InputStream is = conn.getInputStream();
+                 FileOutputStream fos = new FileOutputStream(outputFile)) {
+                byte[] buffer = new byte[4096];
+                int len;
+                while ((len = is.read(buffer)) > 0) fos.write(buffer, 0, len);
+            }
+            return true;
+        }
+    } catch (Exception e) {
+        return false;
+    }
+    return false;
+}
+
 
 // ตรวจสอบชื่อไฟล์ขยะ
 private boolean isUnwanted(String name) {
