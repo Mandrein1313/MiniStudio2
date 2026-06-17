@@ -752,9 +752,9 @@ private void importFromGitHub() {
         dialog.show();
     }
     
-    private void downloadAndImportProject(String repoUrl, String projectName) {
-    // URL ของ GitHub จะต้องต่อท้ายด้วย /archive/refs/heads/master.zip
-    String zipUrl = repoUrl.endsWith("/") ? repoUrl + "archive/refs/heads/master.zip" : repoUrl + "/archive/refs/heads/master.zip";
+private void downloadAndImportProject(String repoUrl, String projectName) {
+    // แก้ไข URL ให้รองรับทั้ง master และ main (GitHub ปัจจุบันนิยมใช้ main)
+    String zipUrl = repoUrl.endsWith("/") ? repoUrl + "archive/refs/heads/main.zip" : repoUrl + "/archive/refs/heads/main.zip";
     File targetDir = new File("/sdcard/MiniStudio/" + projectName);
     File zipFile = new File(getCacheDir(), "temp.zip");
 
@@ -762,19 +762,49 @@ private void importFromGitHub() {
         try {
             // 1. ดาวน์โหลดไฟล์
             URL url = new URL(zipUrl);
-            InputStream is = url.openStream();
-            FileOutputStream fos = new FileOutputStream(zipFile);
-            byte[] buffer = new byte[1024];
-            int len;
-            while ((len = is.read(buffer)) > 0) fos.write(buffer, 0, len);
-            fos.close();
-            is.close();
+            try (InputStream is = url.openStream(); 
+                 FileOutputStream fos = new FileOutputStream(zipFile)) {
+                byte[] buffer = new byte[4096]; // เพิ่ม buffer เป็น 4KB เพื่อความเร็ว
+                int len;
+                while ((len = is.read(buffer)) > 0) fos.write(buffer, 0, len);
+            }
 
             // 2. แตกไฟล์
             targetDir.mkdirs();
             GitHubDownloader.unzip(zipFile, targetDir);
 
-            // 3. ปรับปรุงหน้าจอ (ต้องทำใน UI Thread)
+            // 3. จัดการโครงสร้างโฟลเดอร์และลบขยะ
+            File[] files = targetDir.listFiles();
+            if (files != null) {
+                // ถ้าแตกไฟล์ออกมาแล้วเจอโฟลเดอร์ซ้อน (เช่น MyProject-main)
+                if (files.length == 1 && files[0].isDirectory()) {
+                    File subFolder = files[0];
+                    File[] subFiles = subFolder.listFiles();
+                    if (subFiles != null) {
+                        for (File f : subFiles) {
+                            // ย้ายไฟล์ดีๆ ออกมา, ถ้าเจอขยะให้ลบเลย
+                            if (isUnwanted(f.getName())) {
+                                deleteRecursive(f);
+                            } else {
+                                f.renameTo(new File(targetDir, f.getName()));
+                            }
+                        }
+                    }
+                    subFolder.delete(); // ลบโฟลเดอร์ที่ว่างเปล่าหลังย้ายเสร็จ
+                }
+                
+                // ลบไฟล์ขยะที่อาจหลุดรอดมาในโฟลเดอร์หลัก
+                File[] rootFiles = targetDir.listFiles();
+                if (rootFiles != null) {
+                    for (File f : rootFiles) {
+                        if (isUnwanted(f.getName())) {
+                            deleteRecursive(f);
+                        }
+                    }
+                }
+            }
+
+            // 4. แจ้งเตือนเมื่อเสร็จ
             runOnUiThread(() -> {
                 refreshProjectList();
                 adapter.notifyDataSetChanged();
@@ -783,11 +813,36 @@ private void importFromGitHub() {
 
         } catch (Exception e) {
             e.printStackTrace();
-            runOnUiThread(() -> Toast.makeText(this, "ผิดพลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            runOnUiThread(() -> Toast.makeText(this, "เกิดข้อผิดพลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
         }
     }).start();
 }
 
-    
+// ตรวจสอบชื่อไฟล์ขยะ
+private boolean isUnwanted(String name) {
+    String lower = name.toLowerCase();
+    return lower.equals(".git") || 
+           lower.equals(".gradle") || 
+           lower.equals(".idea") || 
+           lower.equals("build") || 
+           lower.equals(".gitignore") || // เพิ่ม
+           lower.endsWith(".iml") || 
+           lower.endsWith(".md") ||      // เพิ่ม (ไฟล์ README)
+           lower.startsWith("temp");
+}
+
+// ลบไฟล์หรือโฟลเดอร์แบบ Recursive (ต้องเช็ค null ด้วย)
+private void deleteRecursive(File fileOrDirectory) {
+    if (fileOrDirectory.isDirectory()) {
+        File[] children = fileOrDirectory.listFiles();
+        if (children != null) {
+            for (File child : children) {
+                deleteRecursive(child);
+            }
+        }
+    }
+    fileOrDirectory.delete();
+}
+
 
 }
