@@ -754,23 +754,32 @@ private void importFromGitHub() {
     }
     
 private void downloadAndImportProject(String repoUrl, String projectName) {
-    // 1. จัดการ URL: ลบ .git ออก และลบ / ท้ายสุดออก
-    final String cleanUrl = repoUrl.replace(".git", ""); // ต้องเป็น final เพื่อใช้ใน Lambda
+    // 1. ตรวจสอบว่าชื่อโปรเจกต์ซ้ำหรือไม่
+    File targetDir = new File("/sdcard/MiniStudio/" + projectName);
+    String finalProjectName = projectName;
+    
+    // ถ้าชื่อซ้ำ ให้วนลูปเติมตัวเลขต่อท้ายไปเรื่อยๆ จนกว่าจะได้ชื่อที่ไม่ซ้ำ
+    int counter = 1;
+    while (targetDir.exists()) {
+        finalProjectName = projectName + "_" + counter;
+        targetDir = new File("/sdcard/MiniStudio/" + finalProjectName);
+        counter++;
+    }
+    
+    final String actualTargetDirName = finalProjectName; // เก็บชื่อที่ได้จริงๆ ไว้ใช้
+    final String cleanUrl = repoUrl.replace(".git", "");
     final String finalCleanUrl = cleanUrl.endsWith("/") ? cleanUrl.substring(0, cleanUrl.length() - 1) : cleanUrl;
 
-    // 2. ใช้ Thread
     new Thread(() -> {
         try {
             String[] branches = {"master", "main"};
             boolean success = false;
             File zipFile = new File(getCacheDir(), "temp.zip");
-            File targetDir = new File("/sdcard/MiniStudio/" + projectName);
+            File finalTargetDir = new File("/sdcard/MiniStudio/" + actualTargetDirName);
 
             for (String b : branches) {
-                // สร้างตัวแปร final ภายในลูปเพื่อใช้ใน Lambda ของ attemptDownload หรือที่เกี่ยวข้อง
                 final String branch = b; 
                 String zipUrl = finalCleanUrl + "/archive/refs/heads/" + branch + ".zip";
-                
                 if (attemptDownload(zipUrl, zipFile)) {
                     success = true;
                     break;
@@ -781,11 +790,15 @@ private void downloadAndImportProject(String repoUrl, String projectName) {
                 throw new Exception("ไม่พบไฟล์ในทั้ง branch master และ main");
             }
 
-            // 3. แตกไฟล์
-            targetDir.mkdirs();
-            GitHubDownloader.unzip(zipFile, targetDir);
+            finalTargetDir.mkdirs();
+            GitHubDownloader.unzip(zipFile, finalTargetDir);
             
-            runOnUiThread(() -> Toast.makeText(this, "นำเข้าสำเร็จ!", Toast.LENGTH_SHORT).show());
+            // อัปเดต UI ให้ผู้ใช้รู้ว่าเราเปลี่ยนชื่อให้แล้วนะ
+            runOnUiThread(() -> {
+                Toast.makeText(this, "นำเข้าสำเร็จในชื่อ: " + actualTargetDirName, Toast.LENGTH_LONG).show();
+                refreshProjectList();
+                adapter.notifyDataSetChanged();
+            });
 
         } catch (Exception e) {
             runOnUiThread(() -> Toast.makeText(this, "พลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
