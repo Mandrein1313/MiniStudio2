@@ -12,8 +12,21 @@ public class BuildEnvironmentManager {
         this.context = context;
     }
 
-    // 🌟 เตรียม Workflow สำหรับ GitHub Actions (สร้างเฉพาะเมื่อไม่มีไฟล์เท่านั้น)
+    // 🌟 ระบบตรวจสอบ: ถ้าโปรเจกต์ใช้ .kts อยู่แล้ว ให้ข้ามการสร้างไฟล์ทับ
+    private boolean isModernGradleProject(String rootPath) {
+        File rootDir = new File(rootPath);
+        if (!rootDir.exists()) return false;
+        
+        // ถ้าเจอไฟล์ .kts ให้ถือว่าเป็นโปรเจกต์สมัยใหม่ ไม่ต้องยุ่งกับมัน
+        return new File(rootPath, "build.gradle.kts").exists() || 
+               new File(rootPath, "settings.gradle.kts").exists();
+    }
+
+    // 🌟 เตรียม Workflow สำหรับ GitHub Actions (เฉพาะโปรเจกต์ที่ยังไม่มีโครงสร้าง)
     public void prepareGitHubWorkflow(String localProjectPath, String projectName, String packageName, String language, int minSdk) {
+        // ถ้าเป็นโปรเจกต์ .kts ให้รีเทิร์นออกทันที ไม่ทำอะไรทั้งสิ้น
+        if (isModernGradleProject(localProjectPath)) return;
+
         try {
             File workflowDir = new File(localProjectPath, ".github/workflows");
             if (!workflowDir.exists()) {
@@ -73,7 +86,10 @@ public class BuildEnvironmentManager {
     }
 
     private void setupGradleProjectFiles(String rootPath, String projectName, String packageName, String language, int minSdk) {
-        // 1. สร้าง settings.gradle (ถ้ายังไม่มี)
+        // กันเหนียวอีกชั้น
+        if (isModernGradleProject(rootPath)) return;
+
+        // 1. สร้าง settings.gradle
         File settingsFile = new File(rootPath, "settings.gradle");
         if (!settingsFile.exists()) {
             String settingsContent = "pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }\n" +
@@ -82,7 +98,7 @@ public class BuildEnvironmentManager {
             writeFile(settingsFile, settingsContent);
         }
 
-        // 2. สร้าง root build.gradle (ถ้ายังไม่มี)
+        // 2. สร้าง root build.gradle
         File rootBuildGradleFile = new File(rootPath, "build.gradle");
         if (!rootBuildGradleFile.exists()) {
             String rootBuildGradle = "Kotlin".equals(language) ? 
@@ -91,7 +107,7 @@ public class BuildEnvironmentManager {
             writeFile(rootBuildGradleFile, rootBuildGradle);
         }
 
-        // 3. สร้าง app/build.gradle (ถ้ายังไม่มี)
+        // 3. สร้าง app/build.gradle
         File appDir = new File(rootPath, "app");
         if (!appDir.exists()) appDir.mkdirs();
         File appBuildGradleFile = new File(appDir, "build.gradle");
@@ -106,14 +122,14 @@ public class BuildEnvironmentManager {
             writeFile(appBuildGradleFile, appBuildGradle);
         }
 
-        // 4. สร้าง gradle.properties (ถ้ายังไม่มี)
+        // 4. สร้าง gradle.properties
         File gradleProps = new File(rootPath, "gradle.properties");
         if (!gradleProps.exists()) {
             String content = "android.useAndroidX=true\nandroid.enableJetifier=true\norg.gradle.caching=true\norg.gradle.parallel=true";
             writeFile(gradleProps, content);
         }
 
-        // 5. สร้าง .gitignore (ถ้ายังไม่มี)
+        // 5. สร้าง .gitignore
         File gitIgnore = new File(rootPath, ".gitignore");
         if (!gitIgnore.exists()) {
             writeFile(gitIgnore, ".gradle/\nbuild/\napp/build/\nlocal.properties\n.idea/");

@@ -555,6 +555,10 @@ private void importFromGitHub() {
     }
 
  private void deleteRecursive(File fileOrDirectory) {
+    if (fileOrDirectory == null || !fileOrDirectory.exists()) return;
+    if (isProjectIgnored(fileOrDirectory.getName())) {
+        return; 
+    }
     if (fileOrDirectory.isDirectory()) {
         File[] children = fileOrDirectory.listFiles();
         if (children != null) {
@@ -565,8 +569,6 @@ private void importFromGitHub() {
     }
     fileOrDirectory.delete();
 }
-
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_project_list, menu);
@@ -840,8 +842,19 @@ private boolean isUnwanted(String name) {
            lower.endsWith(".md") ||      // เพิ่ม (ไฟล์ README)
            lower.startsWith("temp");
 }
+// เพิ่มฟังก์ชันนี้เข้าไปในคลาสครับ
+private boolean isProjectIgnored(String folderName) {
+    // รายชื่อโฟลเดอร์หรือชื่อโปรเจกต์ที่ไม่ต้องการให้ยุ่ง
+    String[] ignoredItems = {".git", ".gradle", ".idea", "build", "SystemBackup", "Drafts"};
+    
+    for (String item : ignoredItems) {
+        if (folderName.equalsIgnoreCase(item)) {
+            return true; // ถ้าเจอชื่อพวกนี้ ให้ข้ามไปเลย
+        }
+    }
+    return false;
+}
 
-// ลบไฟล์หรือโฟลเดอร์แบบ Recursive (ต้องเช็ค null ด้วย)
 
 
 }
