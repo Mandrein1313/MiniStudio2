@@ -102,21 +102,32 @@ public class ProjectListActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        listView.setOnItemLongClickListener((parent, view, position, id) -> {
-            String projectName = projects.get(position);
-            new AlertDialog.Builder(ProjectListActivity.this)
-                .setTitle("ลบโปรเจกต์")
-                .setMessage("คุณต้องการลบ " + projectName + " ใช่หรือไม่?")
-                .setPositiveButton("ลบ", (dialog, which) -> {
-                    deleteRecursive(new File("/sdcard/MiniStudio/" + projectName));
-                    projects.remove(position);
-                    adapter.notifyDataSetChanged();
-                    Toast.makeText(ProjectListActivity.this, "ลบแล้ว", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton("ยกเลิก", null)
-                .show();
-            return true;
-        });
+ listView.setOnItemLongClickListener((parent, view, position, id) -> {
+    String projectName = projects.get(position);
+    File projectDir = new File("/sdcard/MiniStudio/" + projectName);
+
+    new AlertDialog.Builder(ProjectListActivity.this)
+        .setTitle("ลบโปรเจกต์")
+        .setMessage("คุณต้องการลบ " + projectName + " ใช่หรือไม่?")
+        .setPositiveButton("ลบ", (dialog, which) -> {
+            // 1. เรียกฟังก์ชันลบ
+            deleteRecursive(projectDir);
+
+            // 2. ตรวจสอบว่าลบสำเร็จจริงๆ หรือไม่ (ไฟล์ต้องไม่อยู่แล้ว)
+            if (!projectDir.exists()) {
+                projects.remove(position);
+                adapter.notifyDataSetChanged();
+                Toast.makeText(ProjectListActivity.this, "ลบโปรเจกต์ " + projectName + " เรียบร้อยครับ", Toast.LENGTH_SHORT).show();
+            } else {
+                // ถ้าไฟล์ยังอยู่ (อาจเพราะติด Permission หรือติดไฟล์ที่เปิดค้าง)
+                Toast.makeText(ProjectListActivity.this, "ไม่สามารถลบไฟล์ได้ โปรดตรวจสอบสิทธิ์", Toast.LENGTH_SHORT).show();
+            }
+        })
+        .setNegativeButton("ยกเลิก", null)
+        .show();
+    return true;
+});
+
 
         // 4. ระบบตรวจสอบ GitHub
         SharedPreferences prefs = getSharedPreferences("GitHubPrefs", Context.MODE_PRIVATE);
