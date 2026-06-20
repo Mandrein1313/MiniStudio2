@@ -3,6 +3,9 @@ package com.dev.ministudio;
 import android.content.Context;
 import java.io.File;
 import java.io.FileOutputStream;
+import android.widget.Toast;
+import android.os.Handler;
+import android.os.Looper;
 
 public class BuildEnvironmentManager {
 
@@ -85,63 +88,163 @@ public class BuildEnvironmentManager {
         }
     }
     
- public void importV2rayNGProject(String localProjectPath) {
+public void importV2rayNGProject(String localProjectPath) {
     File projectDir = new File(localProjectPath);
     if (!projectDir.exists()) {
         projectDir.mkdirs();
     }
 
     try {
-        // สำหรับ v2rayNG เราจะไม่ overwrite ทุกอย่าง แต่จะตรวจและเพิ่มเฉพาะที่ขาด
+        boolean isNewProject = false;
+
+        // 1. settings.gradle.kts
         File settingsFile = new File(projectDir, "settings.gradle.kts");
         if (!settingsFile.exists()) {
-            // สร้าง settings ใหม่ (ถ้ายังไม่มี)
-            String settingsContent = """
-                pluginManagement {
-                    repositories {
-                        google()
-                        mavenCentral()
-                        gradlePluginPortal()
-                    }
-                }
-                dependencyResolutionManagement {
-                    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-                    repositories {
-                        google()
-                        mavenCentral()
-                        maven { url = uri("https://jitpack.io") }
-                    }
-                }
-                rootProject.name = "v2rayNG"
-                include(":app")
-                """;
+            String settingsContent = "pluginManagement {\n" +
+                    "    repositories {\n" +
+                    "        google()\n" +
+                    "        mavenCentral()\n" +
+                    "        gradlePluginPortal()\n" +
+                    "    }\n" +
+                    "}\n\n" +
+                    "dependencyResolutionManagement {\n" +
+                    "    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)\n" +
+                    "    repositories {\n" +
+                    "        google()\n" +
+                    "        mavenCentral()\n" +
+                    "        maven { url = uri(\"https://jitpack.io\") }\n" +
+                    "    }\n" +
+                    "}\n\n" +
+                    "rootProject.name = \"v2rayNG\"\n" +
+                    "include(\":app\")\n";
             writeFile(settingsFile, settingsContent);
+            isNewProject = true;
         }
 
-        // ตรวจสอบ libs.versions.toml
+        // 2. libs.versions.toml
         File gradleDir = new File(projectDir, "gradle");
         if (!gradleDir.exists()) gradleDir.mkdirs();
         
         File tomlFile = new File(gradleDir, "libs.versions.toml");
         if (!tomlFile.exists()) {
-            // ใช้เวอร์ชันย่อที่เราสร้าง
-            String tomlContent = """ /* ใส่เนื้อหา toml เดิมที่คุณมี */ """;
+            String tomlContent = "[versions]\n" +
+                    "agp = \"8.5.0\"\n" +
+                    "kotlin = \"2.0.0\"\n" +
+                    "coreKtx = \"1.13.1\"\n" +
+                    "appcompat = \"1.7.0\"\n" +
+                    "material = \"1.12.0\"\n" +
+                    "gson = \"2.11.0\"\n" +
+                    "okhttp = \"4.12.0\"\n" +
+                    "swiperefresh = \"1.1.0\"\n" +
+                    "quickie = \"1.5.0\"\n" +
+                    "toasty = \"1.5.2\"\n" +
+                    "mmkv = \"1.3.0\"\n" +
+                    "coroutines = \"1.8.1\"\n" +
+                    "multidex = \"2.0.1\"\n\n" +
+                    "[libraries]\n" +
+                    "androidx-core-ktx = { module = \"androidx.core:core-ktx\", version.ref = \"coreKtx\" }\n" +
+                    "androidx-appcompat = { module = \"androidx.appcompat:appcompat\", version.ref = \"appcompat\" }\n" +
+                    "material = { module = \"com.google.android.material:material\", version.ref = \"material\" }\n" +
+                    "gson = { module = \"com.google.code.gson:gson\", version.ref = \"gson\" }\n" +
+                    "okhttp = { module = \"com.squareup.okhttp3:okhttp\", version.ref = \"okhttp\" }\n" +
+                    "androidx-swiperefreshlayout = { module = \"androidx.swiperefreshlayout:swiperefreshlayout\", version.ref = \"swiperefresh\" }\n" +
+                    "quickie-foss = { module = \"io.github.g00fy2.quickie:quickie-foss\", version.ref = \"quickie\" }\n" +
+                    "toasty = { module = \"com.github.GrenderG:Toasty\", version.ref = \"toasty\" }\n" +
+                    "mmkv-static = { module = \"com.tencent.mmkv:MMKV-static\", version.ref = \"mmkv\" }\n" +
+                    "kotlinx-coroutines-android = { module = \"org.jetbrains.kotlinx:kotlinx-coroutines-android\", version.ref = \"coroutines\" }\n" +
+                    "multidex = { module = \"androidx.multidex:multidex\", version.ref = \"multidex\" }\n\n" +
+                    "[plugins]\n" +
+                    "android-application = { id = \"com.android.application\", version.ref = \"agp\" }\n" +
+                    "kotlin-android = { id = \"org.jetbrains.kotlin.android\", version.ref = \"kotlin\" }\n";
             writeFile(tomlFile, tomlContent);
+            isNewProject = true;
         }
 
-        // สำคัญ: ไม่ overwrite app/build.gradle.kts ถ้ามีอยู่แล้ว
-        File appBuildFile = new File(projectDir, "app/build.gradle.kts");
+        // 3. app/build.gradle.kts
+        File appDir = new File(projectDir, "app");
+        if (!appDir.exists()) appDir.mkdirs();
+        
+        File appBuildFile = new File(appDir, "build.gradle.kts");
         if (!appBuildFile.exists()) {
-            // สร้างเฉพาะกรณีไม่มี
-            String appBuildContent = """ /* เนื้อหา build.gradle.kts เดิม */ """;
+            String appBuildContent = "plugins {\n" +
+                    "    alias(libs.plugins.android.application)\n" +
+                    "    alias(libs.plugins.kotlin.android)\n" +
+                    "}\n\n" +
+                    "android {\n" +
+                    "    namespace = \"com.v2ray.ang\"\n" +
+                    "    compileSdk = 34\n\n" +
+                    "    defaultConfig {\n" +
+                    "        applicationId = \"com.v2ray.ang\"\n" +
+                    "        minSdk = 24\n" +
+                    "        targetSdk = 34\n" +
+                    "        versionCode = 1\n" +
+                    "        versionName = \"1.0\"\n" +
+                    "        multiDexEnabled = true\n" +
+                    "    }\n\n" +
+                    "    buildTypes {\n" +
+                    "        release {\n" +
+                    "            isMinifyEnabled = false\n" +
+                    "        }\n" +
+                    "    }\n\n" +
+                    "    compileOptions {\n" +
+                    "        isCoreLibraryDesugaringEnabled = true\n" +
+                    "        sourceCompatibility = JavaVersion.VERSION_17\n" +
+                    "        targetCompatibility = JavaVersion.VERSION_17\n" +
+                    "    }\n\n" +
+                    "    kotlin {\n" +
+                    "        compilerOptions {\n" +
+                    "            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)\n" +
+                    "        }\n" +
+                    "    }\n\n" +
+                    "    buildFeatures {\n" +
+                    "        viewBinding = true\n" +
+                    "        buildConfig = true\n" +
+                    "    }\n" +
+                    "}\n\n" +
+                    "dependencies {\n" +
+                    "    implementation(fileTree(mapOf(\"dir\" to \"libs\", \"include\" to listOf(\"*.jar\", \"*.aar\"))))\n\n" +
+                    "    implementation(libs.androidx.core.ktx)\n" +
+                    "    implementation(libs.androidx.appcompat)\n" +
+                    "    implementation(libs.material)\n" +
+                    "    implementation(libs.gson)\n" +
+                    "    implementation(libs.okhttp)\n" +
+                    "    implementation(libs.androidx.swiperefreshlayout)\n" +
+                    "    implementation(libs.quickie.foss)\n" +
+                    "    implementation(libs.toasty)\n" +
+                    "    implementation(libs.mmkv.static)\n" +
+                    "    implementation(libs.kotlinx.coroutines.android)\n" +
+                    "    implementation(libs.multidex)\n" +
+                    "}\n";
             writeFile(appBuildFile, appBuildContent);
+            isNewProject = true;
         }
 
-        Toast.makeText(context, "✅ ตั้งค่า v2rayNG เรียบร้อย (ไม่ทับไฟล์เดิม)", Toast.LENGTH_LONG).show();
+        // 4. gradle.properties
+        File propsFile = new File(projectDir, "gradle.properties");
+        if (!propsFile.exists()) {
+            String props = "android.useAndroidX=true\n" +
+                          "android.enableJetifier=true\n" +
+                          "org.gradle.jvmargs=-Xmx4096m\n" +
+                          "org.gradle.parallel=true";
+            writeFile(propsFile, props);
+        }
+
+        // Toast แบบปลอดภัย (ไม่ cast Activity)
+        if (context != null) {
+            String message = isNewProject ? 
+                "✅ ตั้งค่า v2rayNG เรียบร้อย!" : 
+                "✅ v2rayNG ตรวจสอบแล้ว (ไฟล์เดิมมีอยู่แล้ว)";
+            
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                .post(() -> Toast.makeText(context, message, Toast.LENGTH_LONG).show());
+        }
 
     } catch (Exception e) {
         e.printStackTrace();
-        Toast.makeText(context, "เกิดข้อผิดพลาด: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        if (context != null) {
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                .post(() -> Toast.makeText(context, "❌ เกิดข้อผิดพลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
+        }
     }
 }
     private void setupGradleProjectFiles(String rootPath, String projectName, String packageName, String language, int minSdk) {
