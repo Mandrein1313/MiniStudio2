@@ -247,7 +247,7 @@ public void importV2rayNGProject(String localProjectPath) {
         }
     }
 }
-// สำหรับโปรเจกต์ทั่วไป (ไม่ใช่ v2rayNG)
+// สำหรับโปรเจกต์ทั่วไป - ตรวจจับภาษา Kotlin/Java อัตโนมัติ
     public void importExistingProject(String localProjectPath) {
         File projectDir = new File(localProjectPath);
         if (!projectDir.exists()) {
@@ -255,29 +255,89 @@ public void importV2rayNGProject(String localProjectPath) {
         }
 
         try {
-            // ถ้าเป็นโปรเจกต์ .kts อยู่แล้ว ให้ข้าม
+            // ตรวจสอบว่าเป็นโปรเจกต์ Gradle สมัยใหม่หรือไม่
             if (isModernGradleProject(localProjectPath)) {
-                if (context != null) {
-                    new android.os.Handler(android.os.Looper.getMainLooper())
-                        .post(() -> Toast.makeText(context, "✅ เป็นโปรเจกต์ Gradle สมัยใหม่อยู่แล้ว", Toast.LENGTH_SHORT).show());
-                }
+                showToast("✅ เป็นโปรเจกต์ Gradle สมัยใหม่ (Kotlin DSL) อยู่แล้ว");
                 return;
             }
 
-            // ถ้ายังไม่ใช่โปรเจกต์สมัยใหม่ ให้ตั้งค่าโครงสร้างพื้นฐาน
-            setupGradleProjectFiles(localProjectPath, "MyApp", "com.example.myapp", "Kotlin", 24);
+            // ตรวจจับภาษาอัตโนมัติ
+            String detectedLanguage = detectProjectLanguage(localProjectPath);
+            
+            // ตั้งค่าโครงสร้างพื้นฐาน
+            setupGradleProjectFiles(localProjectPath, 
+                                  "MyApp", 
+                                  "com.example.myapp", 
+                                  detectedLanguage, 
+                                  24);
 
-            if (context != null) {
-                new android.os.Handler(android.os.Looper.getMainLooper())
-                    .post(() -> Toast.makeText(context, "✅ ตั้งค่าโปรเจกต์ทั่วไปเรียบร้อย", Toast.LENGTH_LONG).show());
-            }
+            showToast("✅ ตั้งค่าโปรเจกต์ " + detectedLanguage + " เรียบร้อยแล้ว");
 
         } catch (Exception e) {
             e.printStackTrace();
-            if (context != null) {
-                new android.os.Handler(android.os.Looper.getMainLooper())
-                    .post(() -> Toast.makeText(context, "❌ Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            showToast("❌ Error: " + e.getMessage());
+        }
+    }
+
+    // เมธอดช่วยตรวจจับภาษา Kotlin หรือ Java
+    private String detectProjectLanguage(String rootPath) {
+        File srcMain = new File(rootPath, "app/src/main");
+        
+        if (!srcMain.exists()) {
+            // ตรวจที่ root ของโปรเจกต์
+            srcMain = new File(rootPath, "src/main");
+        }
+
+        if (srcMain.exists()) {
+            // ตรวจ Kotlin ก่อน
+            File kotlinDir = new File(srcMain, "kotlin");
+            if (kotlinDir.exists() && hasFilesWithExtension(kotlinDir, ".kt")) {
+                return "Kotlin";
             }
+
+            // ตรวจ Java
+            File javaDir = new File(srcMain, "java");
+            if (javaDir.exists() && hasFilesWithExtension(javaDir, ".java")) {
+                return "Java";
+            }
+        }
+
+        // ตรวจหาไฟล์ .kt หรือ .java ในโปรเจกต์ทั้งหมด
+        if (hasFileWithExtension(new File(rootPath), ".kt")) {
+            return "Kotlin";
+        }
+        if (hasFileWithExtension(new File(rootPath), ".java")) {
+            return "Java";
+        }
+
+        // ค่าเริ่มต้น
+        return "Kotlin";
+    }
+
+    // ตรวจหาไฟล์ที่มีนามสกุลที่ระบุ
+    private boolean hasFilesWithExtension(File dir, String extension) {
+        if (!dir.exists() || !dir.isDirectory()) return false;
+        
+        File[] files = dir.listFiles();
+        if (files == null) return false;
+        
+        for (File file : files) {
+            if (file.isDirectory()) {
+                if (hasFilesWithExtension(file, extension)) {
+                    return true;
+                }
+            } else if (file.getName().toLowerCase().endsWith(extension)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // เมธอดช่วยแสดง Toast แบบปลอดภัย
+    private void showToast(String message) {
+        if (context != null) {
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                .post(() -> Toast.makeText(context, message, Toast.LENGTH_LONG).show());
         }
     }
     private void setupGradleProjectFiles(String rootPath, String projectName, String packageName, String language, int minSdk) {
