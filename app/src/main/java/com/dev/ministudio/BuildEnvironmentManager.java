@@ -247,6 +247,39 @@ public void importV2rayNGProject(String localProjectPath) {
         }
     }
 }
+// สำหรับโปรเจกต์ทั่วไป (ไม่ใช่ v2rayNG)
+    public void importExistingProject(String localProjectPath) {
+        File projectDir = new File(localProjectPath);
+        if (!projectDir.exists()) {
+            projectDir.mkdirs();
+        }
+
+        try {
+            // ถ้าเป็นโปรเจกต์ .kts อยู่แล้ว ให้ข้าม
+            if (isModernGradleProject(localProjectPath)) {
+                if (context != null) {
+                    new android.os.Handler(android.os.Looper.getMainLooper())
+                        .post(() -> Toast.makeText(context, "✅ เป็นโปรเจกต์ Gradle สมัยใหม่อยู่แล้ว", Toast.LENGTH_SHORT).show());
+                }
+                return;
+            }
+
+            // ถ้ายังไม่ใช่โปรเจกต์สมัยใหม่ ให้ตั้งค่าโครงสร้างพื้นฐาน
+            setupGradleProjectFiles(localProjectPath, "MyApp", "com.example.myapp", "Kotlin", 24);
+
+            if (context != null) {
+                new android.os.Handler(android.os.Looper.getMainLooper())
+                    .post(() -> Toast.makeText(context, "✅ ตั้งค่าโปรเจกต์ทั่วไปเรียบร้อย", Toast.LENGTH_LONG).show());
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (context != null) {
+                new android.os.Handler(android.os.Looper.getMainLooper())
+                    .post(() -> Toast.makeText(context, "❌ Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }
+    }
     private void setupGradleProjectFiles(String rootPath, String projectName, String packageName, String language, int minSdk) {
         // กันเหนียวอีกชั้น
         if (isModernGradleProject(rootPath)) return;
