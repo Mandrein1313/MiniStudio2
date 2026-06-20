@@ -84,7 +84,66 @@ public class BuildEnvironmentManager {
             e.printStackTrace();
         }
     }
+    
+ public void importV2rayNGProject(String localProjectPath) {
+    File projectDir = new File(localProjectPath);
+    if (!projectDir.exists()) {
+        projectDir.mkdirs();
+    }
 
+    try {
+        // สำหรับ v2rayNG เราจะไม่ overwrite ทุกอย่าง แต่จะตรวจและเพิ่มเฉพาะที่ขาด
+        File settingsFile = new File(projectDir, "settings.gradle.kts");
+        if (!settingsFile.exists()) {
+            // สร้าง settings ใหม่ (ถ้ายังไม่มี)
+            String settingsContent = """
+                pluginManagement {
+                    repositories {
+                        google()
+                        mavenCentral()
+                        gradlePluginPortal()
+                    }
+                }
+                dependencyResolutionManagement {
+                    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+                    repositories {
+                        google()
+                        mavenCentral()
+                        maven { url = uri("https://jitpack.io") }
+                    }
+                }
+                rootProject.name = "v2rayNG"
+                include(":app")
+                """;
+            writeFile(settingsFile, settingsContent);
+        }
+
+        // ตรวจสอบ libs.versions.toml
+        File gradleDir = new File(projectDir, "gradle");
+        if (!gradleDir.exists()) gradleDir.mkdirs();
+        
+        File tomlFile = new File(gradleDir, "libs.versions.toml");
+        if (!tomlFile.exists()) {
+            // ใช้เวอร์ชันย่อที่เราสร้าง
+            String tomlContent = """ /* ใส่เนื้อหา toml เดิมที่คุณมี */ """;
+            writeFile(tomlFile, tomlContent);
+        }
+
+        // สำคัญ: ไม่ overwrite app/build.gradle.kts ถ้ามีอยู่แล้ว
+        File appBuildFile = new File(projectDir, "app/build.gradle.kts");
+        if (!appBuildFile.exists()) {
+            // สร้างเฉพาะกรณีไม่มี
+            String appBuildContent = """ /* เนื้อหา build.gradle.kts เดิม */ """;
+            writeFile(appBuildFile, appBuildContent);
+        }
+
+        Toast.makeText(context, "✅ ตั้งค่า v2rayNG เรียบร้อย (ไม่ทับไฟล์เดิม)", Toast.LENGTH_LONG).show();
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        Toast.makeText(context, "เกิดข้อผิดพลาด: " + e.getMessage(), Toast.LENGTH_LONG).show();
+    }
+}
     private void setupGradleProjectFiles(String rootPath, String projectName, String packageName, String language, int minSdk) {
         // กันเหนียวอีกชั้น
         if (isModernGradleProject(rootPath)) return;

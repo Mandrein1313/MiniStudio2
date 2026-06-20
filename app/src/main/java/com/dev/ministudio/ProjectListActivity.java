@@ -766,55 +766,53 @@ private void importFromGitHub() {
         dialog.show();
     }
     
-private void downloadAndImportProject(String repoUrl, String projectName) {
-    // 1. ตรวจสอบว่าชื่อโปรเจกต์ซ้ำหรือไม่
-    File targetDir = new File("/sdcard/MiniStudio/" + projectName);
-    String finalProjectName = projectName;
-    
-    // ถ้าชื่อซ้ำ ให้วนลูปเติมตัวเลขต่อท้ายไปเรื่อยๆ จนกว่าจะได้ชื่อที่ไม่ซ้ำ
-    int counter = 1;
-    while (targetDir.exists()) {
-        finalProjectName = projectName + "_" + counter;
-        targetDir = new File("/sdcard/MiniStudio/" + finalProjectName);
-        counter++;
-    }
-    
-    final String actualTargetDirName = finalProjectName; // เก็บชื่อที่ได้จริงๆ ไว้ใช้
-    final String cleanUrl = repoUrl.replace(".git", "");
-    final String finalCleanUrl = cleanUrl.endsWith("/") ? cleanUrl.substring(0, cleanUrl.length() - 1) : cleanUrl;
+private void downloadAndImportProject(String githubUrl, String projectName) {
+    Toast.makeText(this, "กำลังโคลนโปรเจกต์จาก GitHub...", Toast.LENGTH_LONG).show();
 
     new Thread(() -> {
         try {
-            String[] branches = {"master", "main"};
-            boolean success = false;
-            File zipFile = new File(getCacheDir(), "temp.zip");
-            File finalTargetDir = new File("/sdcard/MiniStudio/" + actualTargetDirName);
+            String localPath = "/sdcard/MiniStudio/" + projectName;
+            File projectDir = new File(localPath);
+            projectDir.mkdirs();
 
-            for (String b : branches) {
-                final String branch = b; 
-                String zipUrl = finalCleanUrl + "/archive/refs/heads/" + branch + ".zip";
-                if (attemptDownload(zipUrl, zipFile)) {
-                    success = true;
-                    break;
-                }
+            // วิธีที่ดีที่สุด: ใช้ git clone (ถ้ามี git)
+            boolean cloneSuccess = false;
+            try {
+                Process process = Runtime.getRuntime().exec(new String[]{
+                    "git", "clone", "--depth=1", "--recurse-submodules", githubUrl, localPath
+                });
+                int exitCode = process.waitFor();
+                cloneSuccess = (exitCode == 0);
+            } catch (Exception e) {
+                // ถ้าไม่มี git ให้แจ้งผู้ใช้
             }
 
-            if (!success) {
-                throw new Exception("ไม่พบไฟล์ในทั้ง branch master และ main");
+            if (!cloneSuccess) {
+                runOnUiThread(() -> 
+                    Toast.makeText(this, "❌ git clone ล้มเหลว\nกรุณาติดตั้ง Git หรือโคลนด้วยตัวเอง", Toast.LENGTH_LONG).show()
+                );
+                return;
             }
 
-            finalTargetDir.mkdirs();
-            GitHubDownloader.unzip(zipFile, finalTargetDir);
-            
-            // อัปเดต UI ให้ผู้ใช้รู้ว่าเราเปลี่ยนชื่อให้แล้วนะ
             runOnUiThread(() -> {
-                Toast.makeText(this, "นำเข้าสำเร็จในชื่อ: " + actualTargetDirName, Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "โคลนสำเร็จ! กำลังตั้งค่า...", Toast.LENGTH_SHORT).show();
+                
+                BuildEnvironmentManager manager = new BuildEnvironmentManager(this);
+                
+                if (githubUrl.contains("2dust/v2rayNG") || githubUrl.contains("V2rayNG")) {
+                    manager.importV2rayNGProject(localPath);
+                } else {
+                    // สำหรับโปรเจกต์ทั่วไป
+                    manager.importExistingProject(localPath); // คุณต้องสร้างเมธอดนี้ให้สมบูรณ์
+                }
+                
                 refreshProjectList();
                 adapter.notifyDataSetChanged();
             });
 
         } catch (Exception e) {
-            runOnUiThread(() -> Toast.makeText(this, "พลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            runOnUiThread(() -> Toast.makeText(this, "เกิดข้อผิดพลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            e.printStackTrace();
         }
     }).start();
 }
