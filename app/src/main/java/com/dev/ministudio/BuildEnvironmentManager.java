@@ -278,39 +278,34 @@ public void importV2rayNGProject(String localProjectPath) {
             showToast("❌ Error: " + e.getMessage());
         }
     }
-
-    // เมธอดช่วยตรวจจับภาษา Kotlin หรือ Java
+// เมธอดช่วยตรวจจับภาษา Kotlin หรือ Java
     private String detectProjectLanguage(String rootPath) {
         File srcMain = new File(rootPath, "app/src/main");
         
         if (!srcMain.exists()) {
-            // ตรวจที่ root ของโปรเจกต์
             srcMain = new File(rootPath, "src/main");
         }
 
         if (srcMain.exists()) {
-            // ตรวจ Kotlin ก่อน
             File kotlinDir = new File(srcMain, "kotlin");
-            if (kotlinDir.exists() && hasFilesWithExtension(kotlinDir, ".kt")) {
+            if (kotlinDir.exists() && hasFilesWithExtension(kotlinDir, ".kt")) {   // แก้ตรงนี้
                 return "Kotlin";
             }
 
-            // ตรวจ Java
             File javaDir = new File(srcMain, "java");
-            if (javaDir.exists() && hasFilesWithExtension(javaDir, ".java")) {
+            if (javaDir.exists() && hasFilesWithExtension(javaDir, ".java")) {    // แก้ตรงนี้
                 return "Java";
             }
         }
 
         // ตรวจหาไฟล์ .kt หรือ .java ในโปรเจกต์ทั้งหมด
-        if (hasFileWithExtension(new File(rootPath), ".kt")) {
+        if (hasFilesWithExtension(new File(rootPath), ".kt")) {                  // แก้ตรงนี้
             return "Kotlin";
         }
-        if (hasFileWithExtension(new File(rootPath), ".java")) {
+        if (hasFilesWithExtension(new File(rootPath), ".java")) {                // แก้ตรงนี้
             return "Java";
         }
 
-        // ค่าเริ่มต้น
         return "Kotlin";
     }
 
