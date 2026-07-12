@@ -1137,38 +1137,65 @@ public void jumpToErrorLocation(String fileName, int lineNumber) {
             codeEditor.getCursor().setRight(targetLine, 0);
             codeEditor.ensurePositionVisible(targetLine, 0);
             
-            showToast("🔍 วาร์ปมาบรรทัดที่ " + lineNumber + " ให้แล้วครับน้า!");
+            showToast("🔍 วาร์ปมาบรรทัดที่ " + lineNumber + " ให้แล้ว!");
         }
     });
 }
 
-// ตัวอย่างโค้ดเมื่อกดปุ่ม Push (สำหรับนำไปใช้ในหน้าแก้ไขโค้ด)
 private void pushChangesToGithub(String projectName) {
+    if (projectName == null || projectName.isEmpty()) {
+        showToast("⚠️ ไม่พบชื่อโปรเจกต์สำหรับทำการ Push");
+        return;
+    }
+
     File projectDir = new File("/sdcard/MiniStudio/" + projectName);
     SharedPreferences prefs = getSharedPreferences("GitHubPrefs", Context.MODE_PRIVATE);
-    String token = prefs.getString("github_token", "");
+    
+    // ดึงทั้ง username และ token มาใช้งานร่วมกันครับน้า
+    String username = prefs.getString("username", "");
+    String token = prefs.getString("github_token", ""); 
+    if (token.isEmpty()) {
+        token = prefs.getString("token", ""); // กันเหนียวเผื่อหน้าตั้งค่าบันทึกไว้ในชื่อคีย์นี้ครับ
+    }
+
+    if (username.isEmpty() || token.isEmpty()) {
+        showToast("❌ ข้อมูล GitHub ไม่ครบ กรุณาตรวจสอบ Username และ Token ในหน้าตั้งค่าก่อนครับ");
+        return;
+    }
+
+    Toast.makeText(this, "🚀 กำลังสับเปลี่ยนลิงก์และ Push โค้ดขึ้น GitHub...", Toast.LENGTH_SHORT).show();
+
+    final String finalToken = token;
+    final String finalUsername = username;
 
     new Thread(() -> {
         try {
+            // เปิดโปรเจกต์ Git ในเครื่องมือถือ
             Git git = Git.open(projectDir);
             
-            // 1. Git Add (เลือกไฟล์ทั้งหมด)
+            // 🌟 [ส่วนที่เพิ่มใหม่]: สั่งล้างลิงก์รีโมทเก่าของเจ้าของเดิม แล้วผูกเข้ากับ Repository บนบัญชีของน้าแทนทันที
+            String myRepoUrl = "https://github.com/" + finalUsername + "/" + projectName + ".git";
+            git.getRepository().getConfig().setString("remote", "origin", "url", myRepoUrl);
+            git.getRepository().getConfig().save(); // บันทึกค่าลงไปในไฟล์โฟลเดอร์ .git ชั่วคราว
+            
+            // 1. Git Add (เลือกไฟล์ทั้งหมดเหมือน git add .)
             git.add().addFilepattern(".").call();
             
             // 2. Git Commit
             git.commit().setMessage("Updated via MiniStudio").call();
             
-            // 3. Git Push โดยใช้ Token เป็นรหัสผ่านในการยืนยันตัวตนแทน Termux
+            // 3. Git Push ยิงตรงเข้าสู่คลังใหม่บน GitHub ของน้า
             git.push()
-               .setCredentialsProvider(new UsernamePasswordCredentialsProvider(token, ""))
+               .setCredentialsProvider(new UsernamePasswordCredentialsProvider(finalToken, ""))
                .call();
 
-            runOnUiThread(() -> Toast.makeText(this, "🚀 Push โค้ดขึ้น GitHub สำเร็จแล้ว!", Toast.LENGTH_SHORT).show());
+            runOnUiThread(() -> Toast.makeText(this, "🚀 Push โค้ดขึ้น GitHub สำเร็จแล้ว!", Toast.LENGTH_LONG).show());
         } catch (Exception e) {
             e.printStackTrace();
             runOnUiThread(() -> Toast.makeText(this, "❌ Push ล้มเหลว: " + e.getMessage(), Toast.LENGTH_LONG).show());
         }
     }).start();
 }
+
 
 }
