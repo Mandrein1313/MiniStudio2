@@ -44,6 +44,9 @@ import android.widget.Spinner;
 import android.graphics.drawable.GradientDrawable;
 // และอย่าลืมเพิ่มตัวที่เหลือถ้าโปรแกรมแจ้งเตือนนะครับ
 
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+
 
 public class ProjectListActivity extends AppCompatActivity {
 
@@ -766,12 +769,12 @@ private void importFromGitHub() {
         dialog.show();
     }
     
-private void downloadAndImportProject(String repoUrl, String projectName) {
-    // 1. ตรวจสอบว่าชื่อโปรเจกต์ซ้ำหรือไม่
+private void downloadAndImportProject(String githubUrl, String projectName) {
+    Toast.makeText(this, "📦 กำลัง Git Clone โปรเจกต์จาก GitHub...", Toast.LENGTH_SHORT).show();
+    
+    // 1. ระบบเช็คชื่อซ้ำอันชาญฉลาดจากโค้ดเก่าของคุณ (คงไว้เหมือนเดิม)
     File targetDir = new File("/sdcard/MiniStudio/" + projectName);
     String finalProjectName = projectName;
-    
-    // ถ้าชื่อซ้ำ ให้วนลูปเติมตัวเลขต่อท้ายไปเรื่อยๆ จนกว่าจะได้ชื่อที่ไม่ซ้ำ
     int counter = 1;
     while (targetDir.exists()) {
         finalProjectName = projectName + "_" + counter;
@@ -779,45 +782,34 @@ private void downloadAndImportProject(String repoUrl, String projectName) {
         counter++;
     }
     
-    final String actualTargetDirName = finalProjectName; // เก็บชื่อที่ได้จริงๆ ไว้ใช้
-    final String cleanUrl = repoUrl.replace(".git", "");
-    final String finalCleanUrl = cleanUrl.endsWith("/") ? cleanUrl.substring(0, cleanUrl.length() - 1) : cleanUrl;
+    final File finalTargetDir = targetDir;
+    final String actualTargetDirName = finalProjectName;
 
+    // 2. รันระบบ Git Clone แท้ๆ ผ่าน Thread แยกเหมือนของ Termux
     new Thread(() -> {
         try {
-            String[] branches = {"master", "main"};
-            boolean success = false;
-            File zipFile = new File(getCacheDir(), "temp.zip");
-            File finalTargetDir = new File("/sdcard/MiniStudio/" + actualTargetDirName);
+            // สั่ง JGit โคลนคลังมาดื้อๆ พร้อมดึง Submodules ทั้งหมด (แก้ปัญหาโค้ดขาดในอนาคต)
+            org.eclipse.jgit.api.Git.cloneRepository()
+                .setURI(githubUrl)
+                .setDirectory(finalTargetDir)
+                .setCloneSubmodules(true)
+                .call();
 
-            for (String b : branches) {
-                final String branch = b; 
-                String zipUrl = finalCleanUrl + "/archive/refs/heads/" + branch + ".zip";
-                if (attemptDownload(zipUrl, zipFile)) {
-                    success = true;
-                    break;
-                }
-            }
-
-            if (!success) {
-                throw new Exception("ไม่พบไฟล์ในทั้ง branch master และ main");
-            }
-
-            finalTargetDir.mkdirs();
-            GitHubDownloader.unzip(zipFile, finalTargetDir);
-            
-            // อัปเดต UI ให้ผู้ใช้รู้ว่าเราเปลี่ยนชื่อให้แล้วนะ
+            // 3. อัปเดตหน้าจอ UI เมื่อเสร็จสิ้น
             runOnUiThread(() -> {
-                Toast.makeText(this, "นำเข้าสำเร็จในชื่อ: " + actualTargetDirName, Toast.LENGTH_LONG).show();
+                Toast.makeText(ProjectListActivity.this, "⚡ Clone สำเร็จในชื่อ: " + actualTargetDirName, Toast.LENGTH_LONG).show();
                 refreshProjectList();
                 adapter.notifyDataSetChanged();
             });
-
         } catch (Exception e) {
-            runOnUiThread(() -> Toast.makeText(this, "พลาด: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            e.printStackTrace();
+            runOnUiThread(() -> {
+                Toast.makeText(ProjectListActivity.this, "❌ Clone ล้มเหลว: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            });
         }
     }).start();
 }
+
 
 // ฟังก์ชันช่วยเช็คว่าดาวน์โหลดได้จริงไหม
 private boolean attemptDownload(String urlString, File outputFile) {

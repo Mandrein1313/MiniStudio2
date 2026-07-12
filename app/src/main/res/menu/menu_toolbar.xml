@@ -6,7 +6,8 @@
         android:title="Build APK"
         android:icon="@drawable/ic_play_run"
         app:showAsAction="ifRoom"
-        app:iconTint="@null" /> <item
+        app:iconTint="@null" />
+         <item
         android:id="@+id/action_search"
         android:title="Search"
         android:icon="@android:drawable/ic_menu_search" 
@@ -19,5 +20,12 @@
         <item
     android:id="@+id/action_ai_settings"
     android:title="AI Settings"/>
+    
+    <item
+    android:id="@+id/action_git_push"
+    android:icon="@drawable/ic_git_push" 
+    android:title="Push to GitHub"
+    app:showAsAction="ifRoom" />
+    
 
 </menu>

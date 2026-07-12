@@ -23,7 +23,6 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
@@ -31,16 +30,13 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.content.res.ColorStateList;
-
 import io.github.rosemoe.sora.widget.CodeEditor;
 import io.github.rosemoe.sora.langs.java.JavaLanguage;
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula;
 import io.github.rosemoe.sora.event.ContentChangeEvent;
-
 import com.dev.ministudio.fs.FileSystemManager;
 import com.dev.ministudio.model.ProjectModel;
 import com.dev.ministudio.model.FileNode;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -50,11 +46,11 @@ import java.util.ArrayList;
 import java.util.List;
 import android.text.SpannableString;
 import android.content.Intent;
-
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import androidx.viewpager2.widget.ViewPager2;
-
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -950,6 +946,16 @@ private void updateAiOutput(String markdownText) {
         if (id == R.id.action_build) { startCloudBuildPipeline(); return true; }
         if (id == R.id.action_preview) { toggleXmlPreview(); return true; }
         
+        // 🌟 จุดที่เพิ่มใหม่: ดักจับการกดปุ่ม Git Push
+        if (id == R.id.action_git_push) { 
+            if (currentProject != null) {
+                pushChangesToGithub(currentProject.getProjectName());
+            } else {
+                showToast("⚠️ กรุณาเปิดโปรเจกต์ก่อนทำการ Push โค้ด");
+            }
+            return true;
+        }
+
         if (id == R.id.action_ai_settings) {
             startActivity(new Intent(this, AiSettingsActivity.class));
             return true;
@@ -961,6 +967,7 @@ private void updateAiOutput(String markdownText) {
         }
         return super.onOptionsItemSelected(item);
     }
+
 
     private void triggerTreeRefresh(FileNode parentNode) { 
         if (projectTreeManager != null) projectTreeManager.refreshFileTree(); 
@@ -1135,5 +1142,33 @@ public void jumpToErrorLocation(String fileName, int lineNumber) {
     });
 }
 
+// ตัวอย่างโค้ดเมื่อกดปุ่ม Push (สำหรับนำไปใช้ในหน้าแก้ไขโค้ด)
+private void pushChangesToGithub(String projectName) {
+    File projectDir = new File("/sdcard/MiniStudio/" + projectName);
+    SharedPreferences prefs = getSharedPreferences("GitHubPrefs", Context.MODE_PRIVATE);
+    String token = prefs.getString("github_token", "");
+
+    new Thread(() -> {
+        try {
+            Git git = Git.open(projectDir);
+            
+            // 1. Git Add (เลือกไฟล์ทั้งหมด)
+            git.add().addFilepattern(".").call();
+            
+            // 2. Git Commit
+            git.commit().setMessage("Updated via MiniStudio").call();
+            
+            // 3. Git Push โดยใช้ Token เป็นรหัสผ่านในการยืนยันตัวตนแทน Termux
+            git.push()
+               .setCredentialsProvider(new UsernamePasswordCredentialsProvider(token, ""))
+               .call();
+
+            runOnUiThread(() -> Toast.makeText(this, "🚀 Push โค้ดขึ้น GitHub สำเร็จแล้ว!", Toast.LENGTH_SHORT).show());
+        } catch (Exception e) {
+            e.printStackTrace();
+            runOnUiThread(() -> Toast.makeText(this, "❌ Push ล้มเหลว: " + e.getMessage(), Toast.LENGTH_LONG).show());
+        }
+    }).start();
+}
 
 }
