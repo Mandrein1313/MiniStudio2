@@ -1173,10 +1173,10 @@ private void pushChangesToGithub(String projectName) {
             // เปิดโปรเจกต์ Git ในเครื่องมือถือ
             Git git = Git.open(projectDir);
             
-            // 🌟 [ส่วนที่เพิ่มใหม่]: สั่งล้างลิงก์รีโมทเก่าของเจ้าของเดิม แล้วผูกเข้ากับ Repository บนบัญชีของน้าแทนทันที
+            // สั่งล้างลิงก์รีโมทเก่าของเจ้าของเดิม แล้วผูกเข้ากับ Repository บนบัญชีของน้าแทนทันที
             String myRepoUrl = "https://github.com/" + finalUsername + "/" + projectName + ".git";
             git.getRepository().getConfig().setString("remote", "origin", "url", myRepoUrl);
-            git.getRepository().getConfig().save(); // บันทึกค่าลงไปในไฟล์โฟลเดอร์ .git ชั่วคราว
+            git.getRepository().getConfig().save(); // บันทึกค่าลงไปในไฟล์โฟลเดอร์ .git
             
             // 1. Git Add (เลือกไฟล์ทั้งหมดเหมือน git add .)
             git.add().addFilepattern(".").call();
@@ -1184,8 +1184,10 @@ private void pushChangesToGithub(String projectName) {
             // 2. Git Commit
             git.commit().setMessage("Updated via MiniStudio").call();
             
-            // 3. Git Push ยิงตรงเข้าสู่คลังใหม่บน GitHub ของน้า
+            // 3. Git Push (ปรับปรุงใหม่: ระบุชื่อกิ่งโค้ดครอบคลุมทุกกิ่งเพื่อป้องกันข้อผิดพลาด)
             git.push()
+               .setRemote("origin")
+               .setRefSpecs(new org.eclipse.jgit.transport.RefSpec("refs/heads/*:refs/heads/*")) // ดันกิ่งโค้ดที่มีในเครื่องทั้งหมดขึ้นไปบนคลังเปล่า
                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(finalToken, ""))
                .call();
 
@@ -1196,6 +1198,7 @@ private void pushChangesToGithub(String projectName) {
         }
     }).start();
 }
+
 
 
 }
