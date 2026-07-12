@@ -51,6 +51,7 @@ import com.google.android.material.tabs.TabLayoutMediator;
 import androidx.viewpager2.widget.ViewPager2;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.eclipse.jgit.transport.URIish;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -1149,56 +1150,72 @@ private void pushChangesToGithub(String projectName) {
     }
 
     File projectDir = new File("/sdcard/MiniStudio/" + projectName);
-    SharedPreferences prefs = getSharedPreferences("GitHubPrefs", Context.MODE_PRIVATE);
-    
-    // ดึงทั้ง username และ token มาใช้งานร่วมกันครับน้า
-    String username = prefs.getString("username", "");
-    String token = prefs.getString("github_token", ""); 
-    if (token.isEmpty()) {
-        token = prefs.getString("token", ""); // กันเหนียวเผื่อหน้าตั้งค่าบันทึกไว้ในชื่อคีย์นี้ครับ
-    }
-
-    if (username.isEmpty() || token.isEmpty()) {
-        showToast("❌ ข้อมูล GitHub ไม่ครบ กรุณาตรวจสอบ Username และ Token ในหน้าตั้งค่าก่อนครับ");
+    if (!projectDir.exists()) {
+        showToast("❌ ไม่พบโฟลเดอร์โปรเจกต์");
         return;
     }
 
-    Toast.makeText(this, "🚀 กำลังสับเปลี่ยนลิงก์และ Push โค้ดขึ้น GitHub...", Toast.LENGTH_SHORT).show();
+    SharedPreferences prefs = getSharedPreferences("GitHubPrefs", Context.MODE_PRIVATE);
+    String username = prefs.getString("username", "");
+    String token = prefs.getString("github_token", "");
+    if (token.isEmpty()) token = prefs.getString("token", "");
+
+    if (username.isEmpty() || token.isEmpty()) {
+        showToast("❌ กรุณาตั้งค่า Username และ GitHub Token ก่อน");
+        return;
+    }
+
+    Toast.makeText(this, "🚀 กำลัง Push ไป GitHub...", Toast.LENGTH_SHORT).show();
 
     final String finalToken = token;
     final String finalUsername = username;
+    final String repoUrl = "https://github.com/" + finalUsername + "/" + projectName + ".git";
 
     new Thread(() -> {
         try {
-            // เปิดโปรเจกต์ Git ในเครื่องมือถือ
-            Git git = Git.open(projectDir);
-            
-            // สั่งล้างลิงก์รีโมทเก่าของเจ้าของเดิม แล้วผูกเข้ากับ Repository บนบัญชีของน้าแทนทันที
-            String myRepoUrl = "https://github.com/" + finalUsername + "/" + projectName + ".git";
-            git.getRepository().getConfig().setString("remote", "origin", "url", myRepoUrl);
-            git.getRepository().getConfig().save(); // บันทึกค่าลงไปในไฟล์โฟลเดอร์ .git
-            
-            // 1. Git Add (เลือกไฟล์ทั้งหมดเหมือน git add .)
+            Git git;
+
+            // ✅ ตรวจสอบและ Init Git ถ้ายังไม่มี
+            if (!new File(projectDir, ".git").exists()) {
+                git = Git.init().setDirectory(projectDir).call();
+                appendLog("✅ สร้าง Git Repository ใหม่สำเร็จ", TerminalColor.SUGGEST_GREEN);
+            } else {
+                git = Git.open(projectDir);
+            }
+
+            // Add ไฟล์ทั้งหมด
             git.add().addFilepattern(".").call();
-            
-            // 2. Git Commit
-            git.commit().setMessage("Updated via MiniStudio").call();
-            
-            // 3. Git Push (ปรับปรุงใหม่: ระบุชื่อกิ่งโค้ดครอบคลุมทุกกิ่งเพื่อป้องกันข้อผิดพลาด)
+
+            // Commit (ถ้ามีการเปลี่ยนแปลง)
+            try {
+                git.commit().setMessage("Updated via MiniStudio - " + new java.util.Date()).call();
+            } catch (Exception ce) {
+                // ไม่มีอะไรเปลี่ยนแปลง → ข้ามได้
+            }
+
+            // ตั้งค่า Remote origin
+            git.remoteAdd().setName("origin").setUri(new URIish(repoUrl)).call();
+
+            // Push
             git.push()
                .setRemote("origin")
-               .setRefSpecs(new org.eclipse.jgit.transport.RefSpec("refs/heads/*:refs/heads/*")) // ดันกิ่งโค้ดที่มีในเครื่องทั้งหมดขึ้นไปบนคลังเปล่า
+               .setPushAll()
                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(finalToken, ""))
                .call();
 
-            runOnUiThread(() -> Toast.makeText(this, "🚀 Push โค้ดขึ้น GitHub สำเร็จแล้ว!", Toast.LENGTH_LONG).show());
+            runOnUiThread(() -> 
+                Toast.makeText(this, "🎉 Push สำเร็จแล้ว!", Toast.LENGTH_LONG).show()
+            );
+
         } catch (Exception e) {
             e.printStackTrace();
-            runOnUiThread(() -> Toast.makeText(this, "❌ Push ล้มเหลว: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
+            runOnUiThread(() -> 
+                Toast.makeText(this, "❌ Push ล้มเหลว: " + errorMsg, Toast.LENGTH_LONG).show()
+            );
         }
     }).start();
 }
-
 
 
 }
