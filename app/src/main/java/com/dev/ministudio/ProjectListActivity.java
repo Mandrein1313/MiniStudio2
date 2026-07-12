@@ -56,6 +56,7 @@ public class ProjectListActivity extends AppCompatActivity {
     private FloatingActionsMenu fabMenu;
     private FloatingActionButton fabCreate;
     private FloatingActionButton fabGithub;
+    private android.app.Dialog loadingDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -153,8 +154,8 @@ public class ProjectListActivity extends AppCompatActivity {
 
 private void importFromGitHub() {
     final EditText etUrl = new EditText(this);
-    etUrl.setHint("วางลิงก์ GitHub (เช่น https://github.com/user/repo)");
-    etUrl.setPadding(30, 30, 30, 30);
+    etUrl.setHint("วางลิงก์ GitHub (เช่น https://github.com/user/repo.git)");
+    etUrl.setPadding(40, 40, 40, 40);
     etUrl.setTextColor(android.graphics.Color.WHITE);
 
     new AlertDialog.Builder(this)
@@ -164,10 +165,15 @@ private void importFromGitHub() {
             String url = etUrl.getText().toString().trim();
             if (url.isEmpty()) {
                 Toast.makeText(this, "กรุณาใส่ลิงก์ก่อนครับ", Toast.LENGTH_SHORT).show();
-            } else {
-                String projectName = "Import_" + System.currentTimeMillis();
-                downloadAndImportProject(url, projectName);
+                return;
             }
+            
+            // เรียก Loading Dialog แบบสวย
+            showLoadingDialog("กำลัง Clone จาก GitHub", 
+                            "กำลังดึงโค้ดทั้งหมด...\nอาจใช้เวลาสักครู่");
+            
+            String projectName = "Import_" + System.currentTimeMillis();
+            downloadAndImportProject(url, projectName);
         })
         .setNegativeButton("ยกเลิก", null)
         .show();
@@ -770,9 +776,6 @@ private void importFromGitHub() {
     }
     
 private void downloadAndImportProject(String githubUrl, String projectName) {
-    Toast.makeText(this, "📦 กำลัง Git Clone โปรเจกต์จาก GitHub...", Toast.LENGTH_SHORT).show();
-    
-    // 1. ระบบเช็คชื่อซ้ำอันชาญฉลาดจากโค้ดเก่าของคุณ (คงไว้เหมือนเดิม)
     File targetDir = new File("/sdcard/MiniStudio/" + projectName);
     String finalProjectName = projectName;
     int counter = 1;
@@ -785,32 +788,66 @@ private void downloadAndImportProject(String githubUrl, String projectName) {
     final File finalTargetDir = targetDir;
     final String actualTargetDirName = finalProjectName;
 
-    // 2. รันระบบ Git Clone แท้ๆ ผ่าน Thread แยกเหมือนของ Termux
     new Thread(() -> {
         try {
-            // สั่ง JGit โคลนคลังมาดื้อๆ พร้อมดึง Submodules ทั้งหมด (แก้ปัญหาโค้ดขาดในอนาคต)
             org.eclipse.jgit.api.Git.cloneRepository()
                 .setURI(githubUrl)
                 .setDirectory(finalTargetDir)
                 .setCloneSubmodules(true)
                 .call();
 
-            // 3. อัปเดตหน้าจอ UI เมื่อเสร็จสิ้น
             runOnUiThread(() -> {
-                Toast.makeText(ProjectListActivity.this, "⚡ Clone สำเร็จในชื่อ: " + actualTargetDirName, Toast.LENGTH_LONG).show();
+                dismissLoadingDialog();                    // ← สำคัญ
+                Toast.makeText(ProjectListActivity.this, 
+                    "✅ Clone สำเร็จ: " + actualTargetDirName, 
+                    Toast.LENGTH_LONG).show();
                 refreshProjectList();
                 adapter.notifyDataSetChanged();
             });
+
         } catch (Exception e) {
             e.printStackTrace();
             runOnUiThread(() -> {
-                Toast.makeText(ProjectListActivity.this, "❌ Clone ล้มเหลว: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                dismissLoadingDialog();                    // ← สำคัญ
+                Toast.makeText(ProjectListActivity.this, 
+                    "❌ Clone ล้มเหลว: " + e.getMessage(), 
+                    Toast.LENGTH_LONG).show();
             });
         }
     }).start();
 }
+// ====================== Custom Loading Dialog ======================
+private void showLoadingDialog(String title, String message) {
+    if (loadingDialog != null && loadingDialog.isShowing()) {
+        loadingDialog.dismiss();
+    }
 
+    loadingDialog = new android.app.Dialog(this);
+    loadingDialog.setContentView(R.layout.dialog_loading);
+    loadingDialog.setCancelable(false);
 
+    if (loadingDialog.getWindow() != null) {
+        loadingDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        loadingDialog.getWindow().setLayout(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+    }
+
+    TextView tvTitle = loadingDialog.findViewById(R.id.tvLoadingTitle);
+    TextView tvMessage = loadingDialog.findViewById(R.id.tvLoadingMessage);
+
+    if (tvTitle != null) tvTitle.setText(title);
+    if (tvMessage != null) tvMessage.setText(message);
+
+    loadingDialog.show();
+}
+
+private void dismissLoadingDialog() {
+    if (loadingDialog != null && loadingDialog.isShowing()) {
+        loadingDialog.dismiss();
+    }
+}
 // ฟังก์ชันช่วยเช็คว่าดาวน์โหลดได้จริงไหม
 private boolean attemptDownload(String urlString, File outputFile) {
     try {
