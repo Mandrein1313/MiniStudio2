@@ -1178,28 +1178,29 @@ private void pushChangesToGithub(String projectName) {
             // ✅ ตรวจสอบและ Init Git ถ้ายังไม่มี
             if (!new File(projectDir, ".git").exists()) {
                 git = Git.init().setDirectory(projectDir).call();
-                appendLog("✅ สร้าง Git Repository ใหม่สำเร็จ", TerminalColor.SUGGEST_GREEN);
+                // appendLog("✅ สร้าง Git Repository ใหม่สำเร็จ", TerminalColor.SUGGEST_GREEN); // เปิดไว้ถ้าน้ามีฟังก์ชัน appendLog ในระบบครับ
             } else {
                 git = Git.open(projectDir);
             }
 
-            // Add ไฟล์ทั้งหมด
+            // 1. Add ไฟล์ทั้งหมด
             git.add().addFilepattern(".").call();
 
-            // Commit (ถ้ามีการเปลี่ยนแปลง)
+            // 2. Commit (ถ้ามีการเปลี่ยนแปลง)
             try {
                 git.commit().setMessage("Updated via MiniStudio - " + new java.util.Date()).call();
             } catch (Exception ce) {
-                // ไม่มีอะไรเปลี่ยนแปลง → ข้ามได้
+                // ไม่มีอะไรเปลี่ยนแปลง → ข้ามได้ ไม่ต้องให้แอปเด้งพัง
             }
 
-            // ตั้งค่า Remote origin
-            git.remoteAdd().setName("origin").setUri(new URIish(repoUrl)).call();
+            // 🌟 [ปรับปรุงจุดนี้]: สั่งเปลี่ยนและบันทึกลิงก์รีโมทเข้าไฟล์คอนฟิกโดยตรง กดซ้ำกี่รอบก็ไม่มีเออร์เรอร์ชื่อซ้ำแล้วครับ
+            git.getRepository().getConfig().setString("remote", "origin", "url", repoUrl);
+            git.getRepository().getConfig().save();
 
-            // Push
+            // 3. Push ยิงตรงเข้า URL คลังของน้าพร้อมดันกิ่งทั้งหมดขึ้นไป
             git.push()
-               .setRemote("origin")
-               .setPushAll()
+               .setRemote(repoUrl) // ยิงเข้าลิงก์ของน้าตรงๆ กันเหนียว
+               .setPushAll()       // ดันทุก Branch ที่มีในเครื่องขึ้นคลังเปล่า
                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(finalToken, ""))
                .call();
 
@@ -1216,6 +1217,7 @@ private void pushChangesToGithub(String projectName) {
         }
     }).start();
 }
+
 
 
 }
