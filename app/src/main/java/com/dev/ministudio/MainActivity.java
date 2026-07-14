@@ -1165,7 +1165,8 @@ private void pushChangesToGithub(String projectName) {
         return;
     }
 
-    Toast.makeText(this, "🚀 กำลัง Push ไป GitHub...", Toast.LENGTH_SHORT).show();
+    // เริ่มต้นแสดงสถานะแรก
+    Toast.makeText(this, "🌀 เริ่มระบบส่งโค้ดไป GitHub...", Toast.LENGTH_SHORT).show();
 
     final String finalToken = token;
     final String finalUsername = username;
@@ -1175,48 +1176,55 @@ private void pushChangesToGithub(String projectName) {
         try {
             Git git;
 
-            // ✅ ตรวจสอบและ Init Git ถ้ายังไม่มี
+            // 📍 ขั้นตอนที่ 1: ตรวจสอบระบบ Git
+            runOnUiThread(() -> Toast.makeText(this, "🔍 [1/4] กำลังตรวจสอบสถานะ Git...", Toast.LENGTH_SHORT).show());
+            
             if (!new File(projectDir, ".git").exists()) {
                 git = Git.init().setDirectory(projectDir).call();
-                // appendLog("✅ สร้าง Git Repository ใหม่สำเร็จ", TerminalColor.SUGGEST_GREEN); // เปิดไว้ถ้าน้ามีฟังก์ชัน appendLog ในระบบครับ
             } else {
                 git = Git.open(projectDir);
             }
 
-            // 1. Add ไฟล์ทั้งหมด
+            // 📍 ขั้นตอนที่ 2: รวบรวมไฟล์ทั้งหมด (Git Add)
+            runOnUiThread(() -> Toast.makeText(this, "📦 [2/4] กำลังรวบรวมไฟล์ทั้งหมดเตรียมส่ง...", Toast.LENGTH_SHORT).show());
             git.add().addFilepattern(".").call();
 
-            // 2. Commit (ถ้ามีการเปลี่ยนแปลง)
+            // 📍 ขั้นตอนที่ 3: บันทึกประวัติการแก้ไข (Git Commit)
+            runOnUiThread(() -> Toast.makeText(this, "💾 [3/4] กำลังทำสัญลักษณ์บันทึกประวัติ (Commit)...", Toast.LENGTH_SHORT).show());
             try {
                 git.commit().setMessage("Updated via MiniStudio - " + new java.util.Date()).call();
             } catch (Exception ce) {
-                // ไม่มีอะไรเปลี่ยนแปลง → ข้ามได้ ไม่ต้องให้แอปเด้งพัง
+                // ไม่มีอะไรเปลี่ยนแปลง ข้ามได้เลย
             }
 
-            // 🌟 [ปรับปรุงจุดนี้]: สั่งเปลี่ยนและบันทึกลิงก์รีโมทเข้าไฟล์คอนฟิกโดยตรง กดซ้ำกี่รอบก็ไม่มีเออร์เรอร์ชื่อซ้ำแล้วครับ
+            // ตั้งค่ารีโมทปลายทาง
             git.getRepository().getConfig().setString("remote", "origin", "url", repoUrl);
             git.getRepository().getConfig().save();
 
-            // 3. Push ยิงตรงเข้า URL คลังของน้าพร้อมดันกิ่งทั้งหมดขึ้นไป
+            // 📍 ขั้นตอนที่ 4: เริ่มอัปโหลดไฟล์ (Git Push) - ขั้นตอนนี้จะใช้เวลานานสุดขึ้นอยู่กับเน็ตครับ
+            runOnUiThread(() -> Toast.makeText(this, "⚡ [4/4] กำลังอัปโหลดข้อมูลขึ้นเซิร์ฟเวอร์ GitHub... (กรุณารอซักครู่)", Toast.LENGTH_LONG).show());
+            
             git.push()
-               .setRemote(repoUrl) // ยิงเข้าลิงก์ของน้าตรงๆ กันเหนียว
-               .setPushAll()       // ดันทุก Branch ที่มีในเครื่องขึ้นคลังเปล่า
+               .setRemote(repoUrl)
+               .setPushAll()
                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(finalToken, ""))
                .call();
 
+            // สำเร็จเสร็จสิ้น!
             runOnUiThread(() -> 
-                Toast.makeText(this, "🎉 Push สำเร็จแล้ว!", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "🎉 [สำเร็จ] อัปโหลดโค้ดขึ้น GitHub เรียบร้อยแล้วครับน้า!", Toast.LENGTH_LONG).show()
             );
 
         } catch (Exception e) {
             e.printStackTrace();
             String errorMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
             runOnUiThread(() -> 
-                Toast.makeText(this, "❌ Push ล้มเหลว: " + errorMsg, Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "❌ Push ล้มเหลวกลางคัน: " + errorMsg, Toast.LENGTH_LONG).show()
             );
         }
     }).start();
 }
+
 
 
 
