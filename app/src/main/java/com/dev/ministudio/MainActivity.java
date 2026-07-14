@@ -1165,19 +1165,48 @@ private void pushChangesToGithub(String projectName) {
         return;
     }
 
-    // เริ่มต้นแสดงสถานะแรก
-    Toast.makeText(this, "🌀 เริ่มระบบส่งโค้ดไป GitHub...", Toast.LENGTH_SHORT).show();
-
     final String finalToken = token;
     final String finalUsername = username;
     final String repoUrl = "https://github.com/" + finalUsername + "/" + projectName + ".git";
 
+    // ==========================================
+    // 🛠️ 1. สร้าง Loading Dialog ขึ้นมาแบบโปรแกรมมิง (ไม่ต้องใช้ XML)
+    // ==========================================
+    android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+    layout.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+    layout.setPadding(60, 50, 60, 50);
+    layout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+    // ตัวหมุน ๆ (ProgressBar)
+    android.widget.ProgressBar progressBar = new android.widget.ProgressBar(this);
+    progressBar.setIndeterminate(true);
+    layout.addView(progressBar);
+
+    // ข้อความแสดงสถานะ (TextView)
+    final android.widget.TextView tvStatus = new android.widget.TextView(this);
+    tvStatus.setText("🚀 กำลังเริ่มระบบส่งโค้ด...");
+    tvStatus.setTextSize(16);
+    tvStatus.setPadding(40, 0, 0, 0);
+    tvStatus.setTextColor(android.graphics.Color.BLACK); // หรือใช้สีตามธีมของน้าได้เลยครับ
+    layout.addView(tvStatus);
+
+    // ประกอบร่างเป็น Dialog
+    android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+    builder.setCancelable(false); // ป้องกันไม่ให้ผู้ใช้กดแตะนอกจอเพื่อปิด (ต้องรอจนกว่าจะเสร็จ)
+    builder.setView(layout);
+    
+    final android.app.AlertDialog progressDialog = builder.create();
+    progressDialog.show(); // สั่งให้แสดงผลขึ้นมาทันที
+
+    // ==========================================
+    // 🛠️ 2. เริ่มทำงานเบื้องหลัง (Background Thread)
+    // ==========================================
     new Thread(() -> {
         try {
             Git git;
 
             // 📍 ขั้นตอนที่ 1: ตรวจสอบระบบ Git
-            runOnUiThread(() -> Toast.makeText(this, "🔍 [1/4] กำลังตรวจสอบสถานะ Git...", Toast.LENGTH_SHORT).show());
+            runOnUiThread(() -> tvStatus.setText("🔍 [1/4] ตรวจสอบสถานะ Git..."));
             
             if (!new File(projectDir, ".git").exists()) {
                 git = Git.init().setDirectory(projectDir).call();
@@ -1186,11 +1215,11 @@ private void pushChangesToGithub(String projectName) {
             }
 
             // 📍 ขั้นตอนที่ 2: รวบรวมไฟล์ทั้งหมด (Git Add)
-            runOnUiThread(() -> Toast.makeText(this, "📦 [2/4] กำลังรวบรวมไฟล์ทั้งหมดเตรียมส่ง...", Toast.LENGTH_SHORT).show());
+            runOnUiThread(() -> tvStatus.setText("📦 [2/4] รวบรวมไฟล์ทั้งหมด..."));
             git.add().addFilepattern(".").call();
 
             // 📍 ขั้นตอนที่ 3: บันทึกประวัติการแก้ไข (Git Commit)
-            runOnUiThread(() -> Toast.makeText(this, "💾 [3/4] กำลังทำสัญลักษณ์บันทึกประวัติ (Commit)...", Toast.LENGTH_SHORT).show());
+            runOnUiThread(() -> tvStatus.setText("💾 [3/4] บันทึกประวัติแก้ไข (Commit)..."));
             try {
                 git.commit().setMessage("Updated via MiniStudio - " + new java.util.Date()).call();
             } catch (Exception ce) {
@@ -1201,8 +1230,8 @@ private void pushChangesToGithub(String projectName) {
             git.getRepository().getConfig().setString("remote", "origin", "url", repoUrl);
             git.getRepository().getConfig().save();
 
-            // 📍 ขั้นตอนที่ 4: เริ่มอัปโหลดไฟล์ (Git Push) - ขั้นตอนนี้จะใช้เวลานานสุดขึ้นอยู่กับเน็ตครับ
-            runOnUiThread(() -> Toast.makeText(this, "⚡ [4/4] กำลังอัปโหลดข้อมูลขึ้นเซิร์ฟเวอร์ GitHub... (กรุณารอซักครู่)", Toast.LENGTH_LONG).show());
+            // 📍 ขั้นตอนที่ 4: อัปโหลดไฟล์ (Git Push) - ขั้นตอนนี้จะใช้เวลานานที่สุดตามความเร็วเน็ต
+            runOnUiThread(() -> tvStatus.setText("⚡ [4/4] กำลังอัปโหลดข้อมูลไป GitHub...\n(ห้ามปิดแอปหรือตัดเน็ตนะครับ)"));
             
             git.push()
                .setRemote(repoUrl)
@@ -1210,22 +1239,25 @@ private void pushChangesToGithub(String projectName) {
                .setCredentialsProvider(new UsernamePasswordCredentialsProvider(finalToken, ""))
                .call();
 
-            // สำเร็จเสร็จสิ้น!
-            runOnUiThread(() -> 
-                Toast.makeText(this, "🎉 [สำเร็จ] อัปโหลดโค้ดขึ้น GitHub เรียบร้อยแล้วครับน้า!", Toast.LENGTH_LONG).show()
-            );
+            // 📍 ทำงานสำเร็จเสร็จสิ้น
+            runOnUiThread(() -> {
+                if (progressDialog.isShowing()) {
+                    progressDialog.dismiss(); // 🎯 ปิดกล่องโหลดหมุน ๆ
+                }
+                Toast.makeText(this, "🎉 อัปโหลดโค้ดขึ้น GitHub สำเร็จแล้วครับน้า!", Toast.LENGTH_LONG).show();
+            });
 
         } catch (Exception e) {
             e.printStackTrace();
             String errorMsg = e.getMessage() != null ? e.getMessage() : "Unknown error";
-            runOnUiThread(() -> 
-                Toast.makeText(this, "❌ Push ล้มเหลวกลางคัน: " + errorMsg, Toast.LENGTH_LONG).show()
-            );
+            runOnUiThread(() -> {
+                if (progressDialog.isShowing()) {
+                    progressDialog.dismiss(); // 🎯 ปิดกล่องโหลดเมื่อพัง
+                }
+                Toast.makeText(this, "❌ Push ล้มเหลว: " + errorMsg, Toast.LENGTH_LONG).show();
+            });
         }
     }).start();
 }
-
-
-
 
 }
