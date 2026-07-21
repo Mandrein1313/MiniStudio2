@@ -52,6 +52,8 @@ import androidx.viewpager2.widget.ViewPager2;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.transport.URIish;
+import android.os.Build;
+
 
 public class MainActivity extends AppCompatActivity {
 
