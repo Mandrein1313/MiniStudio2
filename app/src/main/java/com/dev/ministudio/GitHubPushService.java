@@ -97,6 +97,10 @@ public class GitHubPushService extends Service {
 
                        @Override
                        public boolean isCancelled() { return false; }
+
+                       // 🌟 [แก้จุดนี้] เพิ่มการ Override เมธอดตาม JGit เวอร์ชันใหม่
+                       @Override
+                       public void showDuration(boolean enabled) {}
                    })
                    .setCredentialsProvider(new UsernamePasswordCredentialsProvider(token, ""))
                    .call();
