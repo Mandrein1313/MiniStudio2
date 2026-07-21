@@ -208,22 +208,41 @@ private void importFromGitHub() {
             for (File f : files) if (f.isDirectory()) projects.add(f.getName());
         }
     }
-private void checkPermissions() {
-    // 1. เช็กสิทธิ์เข้าถึงไฟล์ทั้งหมด (MANAGE_EXTERNAL_STORAGE)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        if (!Environment.isExternalStorageManager()) {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-            intent.setData(Uri.parse("package:" + getPackageName()));
-            startActivity(intent);
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // เมื่อผู้ใช้ตอบรับสิทธิ์แจ้งเตือนแล้ว พอกลับมาหน้านี้ ค่อยเช็กสิทธิ์ไฟล์ต่อ
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                checkFilePermission();
+            }
+        } else {
+            checkFilePermission();
         }
     }
-    // 2. 🟢 เพิ่มตรงนี้: เช็กและขอสิทธิ์การแจ้งเตือน (Android 13+)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+
+    private void checkPermissions() {
+        // 1. ขอสิทธิ์การแจ้งเตือนก่อน (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+                return; // หยุดตรงนี้ก่อน เพื่อให้ผู้ใช้กดป๊อบอัพอนุญาต
+            }
+        }
+        // 2. ถ้าสิทธิ์แจ้งเตือนผ่านแล้ว ค่อยเช็กสิทธิ์เข้าถึงไฟล์
+        checkFilePermission();
+    }
+
+    private void checkFilePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            }
         }
     }
-}
+
     // 🟢 หน้าต่างสร้างโปรเจกต์แบบ Advance เพิ่มตัวเลือก Language และ Minimum SDK (ดีไซน์พรีเมียมดาร์กโมด)
     private void showCreateProjectDialog() {
         androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
