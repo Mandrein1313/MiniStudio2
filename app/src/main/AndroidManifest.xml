@@ -47,6 +47,12 @@
             android:foregroundServiceType="dataSync"
             android:enabled="true"
             android:exported="false" />
+            <service 
+    android:name=".GitHubCloneService"
+    android:enabled="true"
+    android:exported="false"
+    android:foregroundServiceType="dataSync" />
+    
 
         <provider
             android:name="androidx.core.content.FileProvider"

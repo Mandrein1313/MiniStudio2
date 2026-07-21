@@ -57,6 +57,25 @@ public class ProjectListActivity extends AppCompatActivity {
     private FloatingActionButton fabCreate;
     private FloatingActionButton fabGithub;
     private android.app.Dialog loadingDialog;
+    
+    private final android.content.BroadcastReceiver cloneReceiver = new android.content.BroadcastReceiver() {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        refreshProjectList();
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
+    }
+};
+
+@Override
+protected void onDestroy() {
+    super.onDestroy();
+    try {
+        unregisterReceiver(cloneReceiver);
+    } catch (Exception e) {}
+}
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -137,7 +156,17 @@ public class ProjectListActivity extends AppCompatActivity {
         SharedPreferences prefs = getSharedPreferences("GitHubPrefs", Context.MODE_PRIVATE);
         if (!prefs.getBoolean("is_github_setup", false)) {
             new android.os.Handler().postDelayed(this::showGitHubSettingsDialog, 600);
+            
         }
+        
+        // เพิ่มตัวรับแจ้งเตือนเมื่อ Service ทำงานเสร็จ
+IntentFilter filter = new IntentFilter(GitHubCloneService.ACTION_CLONE_COMPLETE);
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    registerReceiver(cloneReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+} else {
+    registerReceiver(cloneReceiver, filter);
+}
+
     }
 
     private void setupFabButtons() {
@@ -168,16 +197,13 @@ private void importFromGitHub() {
                 return;
             }
             
-            // เรียก Loading Dialog แบบสวย
-            showLoadingDialog("กำลัง Clone จาก GitHub", 
-                            "กำลังดึงโค้ดทั้งหมด...\nอาจใช้เวลาสักครู่");
-            
             String projectName = "Import_" + System.currentTimeMillis();
             downloadAndImportProject(url, projectName);
         })
         .setNegativeButton("ยกเลิก", null)
         .show();
 }
+
 
   // --- เมธอดส่วนที่เหลือคงเดิม ---
     private void refreshProjectList() {
@@ -784,38 +810,20 @@ private void downloadAndImportProject(String githubUrl, String projectName) {
         targetDir = new File("/sdcard/MiniStudio/" + finalProjectName);
         counter++;
     }
+
+    Intent serviceIntent = new Intent(this, GitHubCloneService.class);
+    serviceIntent.putExtra("githubUrl", githubUrl);
+    serviceIntent.putExtra("projectName", finalProjectName);
     
-    final File finalTargetDir = targetDir;
-    final String actualTargetDirName = finalProjectName;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        startForegroundService(serviceIntent);
+    } else {
+        startService(serviceIntent);
+    }
 
-    new Thread(() -> {
-        try {
-            org.eclipse.jgit.api.Git.cloneRepository()
-                .setURI(githubUrl)
-                .setDirectory(finalTargetDir)
-                .setCloneSubmodules(true)
-                .call();
-
-            runOnUiThread(() -> {
-                dismissLoadingDialog();                    // ← สำคัญ
-                Toast.makeText(ProjectListActivity.this, 
-                    "✅ Clone สำเร็จ: " + actualTargetDirName, 
-                    Toast.LENGTH_LONG).show();
-                refreshProjectList();
-                adapter.notifyDataSetChanged();
-            });
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            runOnUiThread(() -> {
-                dismissLoadingDialog();                    // ← สำคัญ
-                Toast.makeText(ProjectListActivity.this, 
-                    "❌ Clone ล้มเหลว: " + e.getMessage(), 
-                    Toast.LENGTH_LONG).show();
-            });
-        }
-    }).start();
+    Toast.makeText(this, "🚀 เริ่มการ Clone หลังบ้านเรียบร้อยแล้ว", Toast.LENGTH_SHORT).show();
 }
+
 // ====================== Custom Loading Dialog ======================
 private void showLoadingDialog(String title, String message) {
     if (loadingDialog != null && loadingDialog.isShowing()) {
