@@ -34,10 +34,10 @@ public class GitHubPushService extends Service {
         String repoUrl = intent.getStringExtra("repoUrl");
 
         notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("🚀 MiniStudio: " + projectName)
+                .setContentTitle("🚀 MiniStudio: " + (projectName != null ? projectName : "Pushing..."))
                 .setContentText("กำลังเริ่มระบบ...")
                 .setSmallIcon(android.R.drawable.stat_sys_upload)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setOngoing(true)
                 .setProgress(100, 0, true);
 
@@ -60,7 +60,9 @@ public class GitHubPushService extends Service {
                 updateStatus("[3/4] บันทึกประวัติ (Commit)...", 0, true);
                 try {
                     git.commit().setMessage("Updated via MiniStudio - " + new java.util.Date()).call();
-                } catch (Exception ce) {}
+                } catch (Exception ce) {
+                    // กรณีไม่มีไฟล์เปลี่ยนแปลงให้ Commit
+                }
 
                 git.getRepository().getConfig().setString("remote", "origin", "url", repoUrl);
                 git.getRepository().getConfig().save();
@@ -98,7 +100,7 @@ public class GitHubPushService extends Service {
                        @Override
                        public boolean isCancelled() { return false; }
 
-                       // 🌟 [แก้จุดนี้] เพิ่มการ Override เมธอดตาม JGit เวอร์ชันใหม่
+                       // สำหรับ JGit เวอร์ชันใหม่
                        @Override
                        public void showDuration(boolean enabled) {}
                    })
@@ -148,8 +150,9 @@ public class GitHubPushService extends Service {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "GitHub Sync Progress",
-                    NotificationManager.IMPORTANCE_LOW
+                    NotificationManager.IMPORTANCE_DEFAULT
             );
+            channel.setDescription("แสดงความคืบหน้าการ Push โค้ดขึ้น GitHub");
             notificationManager.createNotificationChannel(channel);
         }
     }

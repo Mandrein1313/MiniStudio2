@@ -110,6 +110,8 @@ public class MainActivity extends AppCompatActivity {
    private LinearLayout aiSuggestionBar;
    private TextView tvAiSuggestionText;
    private String lastReceivedSuggestion = "";
+   private String pendingProjectName = "";
+   
 
 
 
@@ -1146,21 +1148,42 @@ public void jumpToErrorLocation(String fileName, int lineNumber) {
 }
 
 private void pushChangesToGithub(String projectName) {
-    // 🛠️ ขอสิทธิ์แจ้งเตือนสำหรับ Android 13 ขึ้นไป
+    if (projectName == null || projectName.isEmpty()) {
+        showToast("⚠️ ไม่พบชื่อโปรเจกต์สำหรับทำการ Push");
+        return;
+    }
+
+    this.pendingProjectName = projectName;
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) 
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            
             requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
             showToast("⚠️ กรุณากดอนุญาตการแจ้งเตือน เพื่อให้เห็นแถบความคืบหน้านะครับ");
             return;
         }
     }
 
-    if (projectName == null || projectName.isEmpty()) {
-        showToast("⚠️ ไม่พบชื่อโปรเจกต์สำหรับทำการ Push");
-        return;
-    }
+    startActualPushService(projectName);
+}
 
+@Override
+public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (requestCode == 101) {
+        if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            showToast("✅ อนุญาตสิทธิ์แล้ว กำลังเริ่มอัปโหลด...");
+            if (!pendingProjectName.isEmpty()) {
+                startActualPushService(pendingProjectName);
+            }
+        } else {
+            showToast("❌ คุณปฏิเสธสิทธิ์การแจ้งเตือน ทำให้ไม่สามารถแสดงความคืบหน้าได้");
+        }
+    }
+}
+
+private void startActualPushService(String projectName) {
     File projectDir = new File("/sdcard/MiniStudio/" + projectName);
     if (!projectDir.exists()) {
         showToast("❌ ไม่พบโฟลเดอร์โปรเจกต์");
@@ -1194,6 +1217,4 @@ private void pushChangesToGithub(String projectName) {
     Toast.makeText(this, "📥 เริ่มอัปโหลดแล้ว! รูดหน้าจอลงมาดู % บน Status Bar ได้เลยครับ", Toast.LENGTH_LONG).show();
 }
 
-
-
-}
+ }
