@@ -29,12 +29,10 @@ import java.util.ArrayList;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-
 import com.getbase.floatingactionbutton.FloatingActionButton;
 import com.getbase.floatingactionbutton.FloatingActionsMenu;
 import java.net.URL;
 import java.io.InputStream;
-
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.text.Editable;
@@ -42,22 +40,17 @@ import android.text.TextWatcher;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.graphics.drawable.GradientDrawable;
-// และอย่าลืมเพิ่มตัวที่เหลือถ้าโปรแกรมแจ้งเตือนนะครับ
-
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-
+import android.content.IntentFilter;
 
 public class ProjectListActivity extends AppCompatActivity {
-
     private ArrayList<String> projects = new ArrayList<>();
     private ArrayAdapter<String> adapter;
     private DrawerLayout drawerLayout;
     private FloatingActionsMenu fabMenu;
     private FloatingActionButton fabCreate;
     private FloatingActionButton fabGithub;
-    private android.app.Dialog loadingDialog;
-    
     private final android.content.BroadcastReceiver cloneReceiver = new android.content.BroadcastReceiver() {
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -694,7 +687,6 @@ private void importFromGitHub() {
         etUsername.setBackground(inputStyle.getConstantState().newDrawable());
         etUsername.setPadding(inputPadding, inputPadding, inputPadding, inputPadding);
         mainLayout.addView(etUsername, boxParams);
-
         // --- GitHub Email ---
         TextView labelEmail = new TextView(this);
         labelEmail.setText("GitHub Email");
@@ -712,7 +704,6 @@ private void importFromGitHub() {
         etEmail.setBackground(inputStyle.getConstantState().newDrawable());
         etEmail.setPadding(inputPadding, inputPadding, inputPadding, inputPadding);
         mainLayout.addView(etEmail, boxParams);
-
         // --- Personal Access Token ---
         TextView labelToken = new TextView(this);
         labelToken.setText("Personal Access Token (Classic)");
@@ -720,7 +711,6 @@ private void importFromGitHub() {
         labelToken.setTextSize(13);
         labelToken.setPadding(0, 0, 0, (int) (6 * getResources().getDisplayMetrics().density));
         mainLayout.addView(labelToken);
-
         final EditText etToken = new EditText(this);
         etToken.setHint("วางโทเค็นสิทธิ์เข้าถึง (ghp_...)");
         etToken.setHintTextColor(android.graphics.Color.parseColor("#52525B"));
@@ -800,7 +790,6 @@ private void importFromGitHub() {
 
         dialog.show();
     }
-    
 private void downloadAndImportProject(String githubUrl, String projectName) {
     File targetDir = new File("/sdcard/MiniStudio/" + projectName);
     String finalProjectName = projectName;
@@ -823,39 +812,6 @@ private void downloadAndImportProject(String githubUrl, String projectName) {
 
     Toast.makeText(this, "🚀 เริ่มการ Clone หลังบ้านเรียบร้อยแล้ว", Toast.LENGTH_SHORT).show();
 }
-
-// ====================== Custom Loading Dialog ======================
-private void showLoadingDialog(String title, String message) {
-    if (loadingDialog != null && loadingDialog.isShowing()) {
-        loadingDialog.dismiss();
-    }
-
-    loadingDialog = new android.app.Dialog(this);
-    loadingDialog.setContentView(R.layout.dialog_loading);
-    loadingDialog.setCancelable(false);
-
-    if (loadingDialog.getWindow() != null) {
-        loadingDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-        loadingDialog.getWindow().setLayout(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-    }
-
-    TextView tvTitle = loadingDialog.findViewById(R.id.tvLoadingTitle);
-    TextView tvMessage = loadingDialog.findViewById(R.id.tvLoadingMessage);
-
-    if (tvTitle != null) tvTitle.setText(title);
-    if (tvMessage != null) tvMessage.setText(message);
-
-    loadingDialog.show();
-}
-
-private void dismissLoadingDialog() {
-    if (loadingDialog != null && loadingDialog.isShowing()) {
-        loadingDialog.dismiss();
-    }
-}
 // ฟังก์ชันช่วยเช็คว่าดาวน์โหลดได้จริงไหม
 private boolean attemptDownload(String urlString, File outputFile) {
     try {
@@ -876,8 +832,6 @@ private boolean attemptDownload(String urlString, File outputFile) {
     }
     return false;
 }
-
-
 // ตรวจสอบชื่อไฟล์ขยะ
 private boolean isUnwanted(String name) {
     String lower = name.toLowerCase();
