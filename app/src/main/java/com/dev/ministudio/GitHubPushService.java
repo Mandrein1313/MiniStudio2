@@ -15,7 +15,9 @@ import java.io.File;
 
 public class GitHubPushService extends Service {
     private static final String CHANNEL_ID = "github_push_channel";
-    private static final int NOTIFICATION_ID = 1001;
+    private static final int NOTIFICATION_ID = 1001;      // ID สำหรับหลอดวิ่งขณะทำงาน
+    private static final int NOTIFICATION_FINAL_ID = 1002;// ID สำหรับแสดงผลลัพธ์ค้างไว้
+    
     private NotificationManager notificationManager;
     private NotificationCompat.Builder notificationBuilder;
 
@@ -33,12 +35,14 @@ public class GitHubPushService extends Service {
         String token = intent.getStringExtra("token");
         String repoUrl = intent.getStringExtra("repoUrl");
 
+        // 🌟 ตั้งค่า Notification แบบเงียบ (ไม่มีเสียง) + แสดงสถานะเริ่มต้น
         notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("🚀 MiniStudio: " + (projectName != null ? projectName : "Pushing..."))
-                .setContentText("กำลังเริ่มระบบ...")
+                .setContentText("กำลังเริ่มระบบ... 0%")
                 .setSmallIcon(android.R.drawable.stat_sys_upload)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW) // ไร้เสียงเตือน
+                .setOnlyAlertOnce(true)
+                .setOngoing(true) // ป้องกันผู้ใช้เผลอลบระหว่างอัปโหลด
                 .setProgress(100, 0, true);
 
         startForeground(NOTIFICATION_ID, notificationBuilder.build());
@@ -67,7 +71,7 @@ public class GitHubPushService extends Service {
                 git.getRepository().getConfig().setString("remote", "origin", "url", repoUrl);
                 git.getRepository().getConfig().save();
 
-                // [4/4] Push พร้อมระบบนับ % ความคืบหน้า
+                // 🌟 [4/4] Push พร้อมแสดง % และหลอดวิ่ง
                 git.push()
                    .setRemote(repoUrl)
                    .setPushAll()
@@ -82,7 +86,7 @@ public class GitHubPushService extends Service {
                        public void beginTask(String title, int totalWork) {
                            this.totalTasks = totalWork;
                            this.completed = 0;
-                           updateStatus("[4/4] " + title, 0, false);
+                           updateProgress("[4/4] " + title + " 0%", 0);
                        }
 
                        @Override
@@ -100,20 +104,22 @@ public class GitHubPushService extends Service {
                        @Override
                        public boolean isCancelled() { return false; }
 
-                       // สำหรับ JGit เวอร์ชันใหม่
                        @Override
                        public void showDuration(boolean enabled) {}
                    })
                    .setCredentialsProvider(new UsernamePasswordCredentialsProvider(token, ""))
                    .call();
 
+                // 🌟 แสดงแจ้งเตือนค้างไว้เมื่อสำเร็จ
                 showFinalNotification("🎉 อัปโหลดขึ้น GitHub สำเร็จแล้วครับ!", false);
 
             } catch (Exception e) {
                 e.printStackTrace();
+                // 🌟 แสดงแจ้งเตือนค้างไว้เมื่อล้มเหลว
                 showFinalNotification("❌ ล้มเหลว: " + e.getMessage(), true);
             } finally {
-                stopForeground(false);
+                // ปิด Service หลอดวิ่ง
+                stopForeground(true); 
                 stopSelf();
             }
         }).start();
@@ -133,16 +139,19 @@ public class GitHubPushService extends Service {
         notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
     }
 
+    // 🌟 ฟังก์ชันสร้าง Notification แสดงผลลัพธ์แบบ "ค้างไว้บนหน้าจอ"
     private void showFinalNotification(String resultText, boolean isError) {
         NotificationCompat.Builder finalBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle(isError ? "❌ MiniStudio Push Error" : "🎉 MiniStudio Push Success")
+                .setContentTitle(isError ? "❌ MiniStudio: Push ล้มเหลว" : "✅ MiniStudio: Push สำเร็จ")
                 .setContentText(resultText)
                 .setSmallIcon(isError ? android.R.drawable.stat_notify_error : android.R.drawable.stat_sys_upload_done)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setOngoing(false)
-                .setProgress(0, 0, false);
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT) // แสดงแจ้งเตือนปกติ
+                .setOngoing(false)       // ตั้งให้ปัดลบออกเองได้
+                .setAutoCancel(true)     // กดแตะที่แจ้งเตือนแล้วให้ซ่อนอัตโนมัติ
+                .setProgress(0, 0, false); // เอาหลอดโหลดออก
 
-        notificationManager.notify(NOTIFICATION_ID, finalBuilder.build());
+        // ใช้ NOTIFICATION_FINAL_ID เพื่อไม่ให้โดนลบตอน stopForeground
+        notificationManager.notify(NOTIFICATION_FINAL_ID, finalBuilder.build());
     }
 
     private void createNotificationChannel() {
@@ -150,10 +159,15 @@ public class GitHubPushService extends Service {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "GitHub Sync Progress",
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_LOW
             );
             channel.setDescription("แสดงความคืบหน้าการ Push โค้ดขึ้น GitHub");
-            notificationManager.createNotificationChannel(channel);
+            channel.setSound(null, null);
+            channel.enableVibration(false);
+
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
         }
     }
 
