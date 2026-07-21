@@ -236,20 +236,19 @@ public class DownloadApkService extends Service {
         isRunning = false;
     }
 
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Download APK Service",
-                    NotificationManager.IMPORTANCE_LOW
-            );
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.createNotificationChannel(channel);
-            }
+private void createNotificationChannel() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "Download APK Service",
+                NotificationManager.IMPORTANCE_DEFAULT // 👈 ดันขึ้น Status Bar ชัดเจน
+        );
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager != null) {
+            manager.createNotificationChannel(channel);
         }
     }
-
+}
     private Notification createNotification(String message, int progress) {
         Intent notificationIntent = new Intent(this, ProjectListActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
