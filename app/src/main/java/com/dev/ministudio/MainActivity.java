@@ -1146,6 +1146,16 @@ public void jumpToErrorLocation(String fileName, int lineNumber) {
 }
 
 private void pushChangesToGithub(String projectName) {
+    // 🛠️ ขอสิทธิ์แจ้งเตือนสำหรับ Android 13 ขึ้นไป
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) 
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+            showToast("⚠️ กรุณากดอนุญาตการแจ้งเตือน เพื่อให้เห็นแถบความคืบหน้านะครับ");
+            return;
+        }
+    }
+
     if (projectName == null || projectName.isEmpty()) {
         showToast("⚠️ ไม่พบชื่อโปรเจกต์สำหรับทำการ Push");
         return;
@@ -1169,7 +1179,6 @@ private void pushChangesToGithub(String projectName) {
 
     String repoUrl = "https://github.com/" + username + "/" + projectName + ".git";
 
-    // 🚀 สั่งเรียกรัน Foreground Service เพื่อความปลอดภัยสูงสุด
     Intent serviceIntent = new Intent(this, GitHubPushService.class);
     serviceIntent.putExtra("projectName", projectName);
     serviceIntent.putExtra("username", username);
@@ -1182,8 +1191,9 @@ private void pushChangesToGithub(String projectName) {
         startService(serviceIntent);
     }
 
-    Toast.makeText(this, "📥 เริ่มอัปโหลดเบื้องหลังแล้ว ดูสถานะบน Status Bar !", Toast.LENGTH_LONG).show();
+    Toast.makeText(this, "📥 เริ่มอัปโหลดแล้ว! รูดหน้าจอลงมาดู % บน Status Bar ได้เลยครับ", Toast.LENGTH_LONG).show();
 }
+
 
 
 }
