@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"> 
     
+    <!-- สิทธิ์เดิมของแอป -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -8,6 +9,9 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     
+    <!-- 🌟 [เพิ่มใหม่] สิทธิ์สำหรับการรัน Foreground Service เบื้องหลังขณะปิดหน้าจอ -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -34,6 +38,13 @@
 
         <activity android:name=".AiSettingsActivity"
          android:exported="false" />
+
+        <!-- 🌟 [เพิ่มใหม่] ประกาศลงทะเบียนบริการ GitHubPushService เพื่อให้ระบบ Android รู้จัก -->
+        <service 
+            android:name=".GitHubPushService"
+            android:foregroundServiceType="dataSync"
+            android:enabled="true"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
