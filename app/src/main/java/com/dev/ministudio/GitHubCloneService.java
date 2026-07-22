@@ -142,19 +142,57 @@ public class GitHubCloneService extends Service {
         notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
     }
 
-    private void showFinalNotification(String resultText, boolean isError) {
-        NotificationCompat.Builder finalBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle(isError ? "❌ MiniStudio: Clone ล้มเหลว" : "✅ MiniStudio: Clone สำเร็จ")
-                .setContentText(resultText)
-                .setSmallIcon(isError ? android.R.drawable.stat_notify_error : android.R.drawable.stat_sys_download_done)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setOngoing(false)
-                .setAutoCancel(true)
-                .setProgress(0, 0, false);
+private void showFinalNotification(String resultText, boolean isError) {
+    NotificationCompat.Builder finalBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(isError ? "❌ MiniStudio: บิวด์/โหลด ล้มเหลว" : "✅ MiniStudio: ดาวน์โหลด APK เสร็จสมบูรณ์")
+            .setContentText(resultText)
+            .setSmallIcon(isError ? android.R.drawable.stat_notify_error : android.R.drawable.stat_sys_download_done)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(false)
+            .setAutoCancel(true) // แตะแล้วซ่อนการแจ้งเตือนอัตโนมัติ
+            .setProgress(0, 0, false);
 
-        notificationManager.notify(NOTIFICATION_FINAL_ID, finalBuilder.build());
+    // ถ้าทำงานสำเร็จ ให้สร้าง Intent สำหรับเรียกหน้าติดตั้ง APK
+    if (!isError) {
+        try {
+            // 📍 ระบุ File Path ของไฟล์ APK ที่ดาวน์โหลดมาไว้ (ปรับตาม Path จริงที่น้าเซฟไฟล์นะครับ)
+            File apkFile = new File("/sdcard/MiniStudio/app-release.apk");
+
+            if (apkFile.exists()) {
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                Uri apkUri;
+
+                // รองรับ Android 7.0 (API 24) ขึ้นไป
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    apkUri = androidx.core.content.FileProvider.getUriForFile(
+                            this,
+                            getPackageName() + ".fileprovider",
+                            apkFile
+                    );
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } else {
+                    apkUri = Uri.fromFile(apkFile);
+                }
+
+                intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                // สร้าง PendingIntent สำหรับผูกกับ Notification
+                int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    flags |= PendingIntent.FLAG_IMMUTABLE;
+                }
+
+                PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, flags);
+                finalBuilder.setContentIntent(pendingIntent);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
+    notificationManager.notify(NOTIFICATION_FINAL_ID, finalBuilder.build());
+}
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -171,7 +209,6 @@ public class GitHubCloneService extends Service {
             }
         }
     }
-
     private void deleteRecursive(File fileOrDirectory) {
         if (fileOrDirectory != null && fileOrDirectory.exists()) {
             if (fileOrDirectory.isDirectory()) {
