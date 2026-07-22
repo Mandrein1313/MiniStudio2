@@ -224,17 +224,62 @@ public class DownloadApkService extends Service {
         sendBroadcast(intent);
     }
 
-    private void endDownload(boolean success, File apkFile) {
-        Intent intent = new Intent(ACTION_DOWNLOAD_COMPLETE);
-        intent.putExtra(EXTRA_SUCCESS, success);
-        if (apkFile != null) {
-            intent.putExtra(EXTRA_APK_PATH, apkFile.getAbsolutePath());
-        }
-        sendBroadcast(intent);
-        stopForeground(true);
-        stopSelf();
-        isRunning = false;
+private void endDownload(boolean success, File apkFile) {
+    Intent intent = new Intent(ACTION_DOWNLOAD_COMPLETE);
+    intent.putExtra(EXTRA_SUCCESS, success);
+    if (apkFile != null) {
+        intent.putExtra(EXTRA_APK_PATH, apkFile.getAbsolutePath());
     }
+    sendBroadcast(intent);
+
+    // 🌟 เรียกฟังก์ชันแสดงแจ้งเตือนแบบค้างไว้หลังดาวน์โหลดเสร็จ
+    showFinalNotification(apkFile, success ? "ดาวน์โหลด APK สำเร็จแล้ว แตะเพื่อติดตั้ง" : "ดาวน์โหลด APK ล้มเหลว", !success);
+
+    isRunning = false;
+}
+
+private void showFinalNotification(File apkFile, String resultText, boolean isError) {
+    NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+    NotificationCompat.Builder finalBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(isError ? "❌ MiniStudio: ดาวน์โหลดล้มเหลว" : "✅ MiniStudio: ดาวน์โหลด APK เสร็จแล้ว")
+            .setContentText(resultText)
+            .setSmallIcon(isError ? android.R.drawable.stat_notify_error : android.R.drawable.stat_sys_download_done)
+            .setPriority(NotificationCompat.PRIORITY_HIGH) // ดันความสำคัญเพื่อให้แจ้งเตือนเด่นชัด
+            .setOngoing(false) // ให้ผู้ใช้ปัดทิ้งเองได้
+            .setAutoCancel(true) // แตะแล้วหายไปเองอัตโนมัติ
+            .setProgress(0, 0, false);
+
+    // ถ้าดาวน์โหลดสำเร็จ ผูก Intent เปิดหน้าติดตั้ง APK ไว้เมื่อกดที่ Notification
+    if (!isError && apkFile != null && apkFile.exists()) {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        Uri apkUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", apkFile);
+        intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, flags);
+        finalBuilder.setContentIntent(pendingIntent);
+    }
+
+    // 🌟 ปลดสถานะ Foreground โดยคงการแจ้งเตือนนี้ไว้บน Status Bar
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        stopForeground(STOP_FOREGROUND_DETACH);
+    } else {
+        stopForeground(false);
+    }
+
+    // แสดงแจ้งเตือนตัวสุดท้ายค้างไว้
+    if (notificationManager != null) {
+        notificationManager.notify(NOTIFICATION_ID, finalBuilder.build());
+    }
+
+    stopSelf(); // ปิดการทำงาน Service เบื้องหลัง
+}
 
 private void createNotificationChannel() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
