@@ -176,12 +176,13 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
 private void importFromGitHub() {
     final EditText etUrl = new EditText(this);
-    etUrl.setHint("วางลิงก์ GitHub (เช่น https://github.com/user/repo.git)");
+    etUrl.setHint("https://github.com/user/repository.git");
     etUrl.setPadding(40, 40, 40, 40);
     etUrl.setTextColor(android.graphics.Color.WHITE);
 
     new AlertDialog.Builder(this)
         .setTitle("นำเข้าโปรเจกต์จาก GitHub")
+        .setMessage("ระบบจะดึงเฉพาะ Commit ล่าสุด (Shallow Clone) เพื่อความรวดเร็ว")
         .setView(etUrl)
         .setPositiveButton("ดาวน์โหลด", (dialog, which) -> {
             String url = etUrl.getText().toString().trim();
@@ -190,11 +191,32 @@ private void importFromGitHub() {
                 return;
             }
             
-            String projectName = "Import_" + System.currentTimeMillis();
+            // 💡 แกะชื่อ Repo จาก URL อัตโนมัติ (เช่น https://github.com/aaa/bbb.git -> bbb)
+            String projectName = extractRepoName(url);
+            if (projectName == null || projectName.isEmpty()) {
+                projectName = "Import_" + System.currentTimeMillis();
+            }
+            
             downloadAndImportProject(url, projectName);
         })
         .setNegativeButton("ยกเลิก", null)
         .show();
+}
+
+// 🟢 วางฟังก์ชันนี้เพิ่มเข้าไปได้เลยครับ
+private String extractRepoName(String url) {
+    try {
+        String cleanUrl = url.trim();
+        if (cleanUrl.endsWith("/")) {
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+        }
+        if (cleanUrl.endsWith(".git")) {
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 4);
+        }
+        return cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+    } catch (Exception e) {
+        return null;
+    }
 }
 
 
@@ -823,9 +845,14 @@ private void downloadAndImportProject(String githubUrl, String projectName) {
         counter++;
     }
 
+    // 💡 ดึง Token จาก SharedPreferences ส่งติดไปด้วย
+    SharedPreferences prefs = getSharedPreferences("GitHubPrefs", Context.MODE_PRIVATE);
+    String token = prefs.getString("token", "");
+
     Intent serviceIntent = new Intent(this, GitHubCloneService.class);
     serviceIntent.putExtra("githubUrl", githubUrl);
     serviceIntent.putExtra("projectName", finalProjectName);
+    serviceIntent.putExtra("token", token); // ⚡ เพิ่มบรรทัดนี้ส่ง Token ไปให้ Service หลังบ้าน
     
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         startForegroundService(serviceIntent);
@@ -835,6 +862,7 @@ private void downloadAndImportProject(String githubUrl, String projectName) {
 
     Toast.makeText(this, "🚀 เริ่มการ Clone หลังบ้านเรียบร้อยแล้ว", Toast.LENGTH_SHORT).show();
 }
+
 // ฟังก์ชันช่วยเช็คว่าดาวน์โหลดได้จริงไหม
 private boolean attemptDownload(String urlString, File outputFile) {
     try {

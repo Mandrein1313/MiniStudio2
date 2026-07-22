@@ -11,9 +11,8 @@ import android.os.IBinder;
 import androidx.core.app.NotificationCompat;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import java.io.File;
-import android.net.Uri;
-
 
 public class GitHubCloneService extends Service {
     private static final String CHANNEL_ID = "github_clone_channel";
@@ -43,12 +42,15 @@ public class GitHubCloneService extends Service {
             return START_NOT_STICKY;
         }
 
+        if (intent == null) return START_NOT_STICKY;
+
         String githubUrl = intent.getStringExtra("githubUrl");
         String projectName = intent.getStringExtra("projectName");
+        String token = intent.getStringExtra("token"); // รองรับ GitHub Token (ถ้ามี)
 
         isCancelled = false;
 
-        // ปุ่มยกเลิก
+        // ปุ่มยกเลิกการดาวน์โหลด
         Intent cancelIntent = new Intent(this, GitHubCloneService.class);
         cancelIntent.setAction(ACTION_CANCEL);
         PendingIntent pendingCancelIntent = PendingIntent.getService(
@@ -57,7 +59,7 @@ public class GitHubCloneService extends Service {
         );
 
         notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("📥 MiniStudio: กำลัง Clone " + projectName)
+                .setContentTitle("📥 MiniStudio: กำลัง Clone " + (projectName != null ? projectName : "Project"))
                 .setContentText("กำลังเริ่มการเชื่อมต่อ... 0%")
                 .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -73,10 +75,13 @@ public class GitHubCloneService extends Service {
             try {
                 if (isCancelled) return;
 
-                Git.cloneRepository()
+                // 🌟 ตั้งค่า Clone Repository แบบความเร็วสูง (Shallow Clone)
+                org.eclipse.jgit.api.CloneCommand cloneCommand = Git.cloneRepository()
                         .setURI(githubUrl)
                         .setDirectory(targetDir)
-                        .setCloneSubmodules(true)
+                        .setDepth(1)                   // ⚡ ดึงเฉพาะ Commit ล่าสุด (ประหยัดเวลาและพื้นที่)
+                        .setCloneAllBranches(false)     // ⚡ ดึงเฉพาะ Branch หลัก
+                        .setCloneSubmodules(true)       // ⚡ ดึง Submodule ที่จำเป็นติดมาด้วย
                         .setProgressMonitor(new ProgressMonitor() {
                             private int totalTasks = 0;
                             private int completed = 0;
@@ -112,19 +117,25 @@ public class GitHubCloneService extends Service {
 
                             @Override
                             public void showDuration(boolean enabled) {}
-                        })
-                        .call();
+                        });
+
+                // ใส่ Credential กรณีดาวน์โหลด Private Repository
+                if (token != null && !token.trim().isEmpty()) {
+                    cloneCommand.setCredentialsProvider(new UsernamePasswordCredentialsProvider(token, ""));
+                }
+
+                cloneCommand.call();
 
                 if (!isCancelled) {
-                    showFinalNotification("🎉 Clone โปรเจกต์ " + projectName + " สำเร็จ!", false);
-                    // ส่ง Broadcast แจ้งให้ Activity อัปเดตรายการโปรเจกต์
+                    showFinalNotification("🎉 Clone โปรเจกต์ " + projectName + " สำเร็จแล้ว!", false);
+                    // ส่ง Broadcast แจ้งให้ ProjectListActivity อัปเดตแสดงโฟลเดอร์โปรเจกต์ใหม่ทันที
                     sendBroadcast(new Intent(ACTION_CLONE_COMPLETE));
                 }
 
             } catch (Exception e) {
                 if (!isCancelled) {
                     e.printStackTrace();
-                    // ถ้าพัง ลบโฟลเดอร์ขยะออก
+                    // ถ้าเกิดข้อผิดพลาด ลบโฟลเดอร์ขยะที่ดาวน์โหลดค้างไว้ออก
                     deleteRecursive(targetDir);
                     showFinalNotification("❌ Clone ล้มเหลว: " + e.getMessage(), true);
                 }
@@ -144,57 +155,19 @@ public class GitHubCloneService extends Service {
         notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build());
     }
 
-private void showFinalNotification(String resultText, boolean isError) {
-    NotificationCompat.Builder finalBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(isError ? "❌ MiniStudio: บิวด์/โหลด ล้มเหลว" : "✅ MiniStudio: ดาวน์โหลด APK เสร็จสมบูรณ์")
-            .setContentText(resultText)
-            .setSmallIcon(isError ? android.R.drawable.stat_notify_error : android.R.drawable.stat_sys_download_done)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setOngoing(false)
-            .setAutoCancel(true) // แตะแล้วซ่อนการแจ้งเตือนอัตโนมัติ
-            .setProgress(0, 0, false);
+    private void showFinalNotification(String resultText, boolean isError) {
+        NotificationCompat.Builder finalBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle(isError ? "❌ MiniStudio: Clone ล้มเหลว" : "✅ MiniStudio: Clone สำเร็จ")
+                .setContentText(resultText)
+                .setSmallIcon(isError ? android.R.drawable.stat_notify_error : android.R.drawable.stat_sys_download_done)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setOngoing(false)
+                .setAutoCancel(true)
+                .setProgress(0, 0, false);
 
-    // ถ้าทำงานสำเร็จ ให้สร้าง Intent สำหรับเรียกหน้าติดตั้ง APK
-    if (!isError) {
-        try {
-            // 📍 ระบุ File Path ของไฟล์ APK ที่ดาวน์โหลดมาไว้ (ปรับตาม Path จริงที่น้าเซฟไฟล์นะครับ)
-            File apkFile = new File("/sdcard/MiniStudio/app-release.apk");
-
-            if (apkFile.exists()) {
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                Uri apkUri;
-
-                // รองรับ Android 7.0 (API 24) ขึ้นไป
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    apkUri = androidx.core.content.FileProvider.getUriForFile(
-                            this,
-                            getPackageName() + ".fileprovider",
-                            apkFile
-                    );
-                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                } else {
-                    apkUri = Uri.fromFile(apkFile);
-                }
-
-                intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-                // สร้าง PendingIntent สำหรับผูกกับ Notification
-                int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    flags |= PendingIntent.FLAG_IMMUTABLE;
-                }
-
-                PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, flags);
-                finalBuilder.setContentIntent(pendingIntent);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        notificationManager.notify(NOTIFICATION_FINAL_ID, finalBuilder.build());
     }
 
-    notificationManager.notify(NOTIFICATION_FINAL_ID, finalBuilder.build());
-}
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -211,6 +184,7 @@ private void showFinalNotification(String resultText, boolean isError) {
             }
         }
     }
+
     private void deleteRecursive(File fileOrDirectory) {
         if (fileOrDirectory != null && fileOrDirectory.exists()) {
             if (fileOrDirectory.isDirectory()) {
