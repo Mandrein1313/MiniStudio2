@@ -12,6 +12,8 @@ import androidx.core.app.NotificationCompat;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import java.io.File;
+import android.net.Uri;
+
 
 public class GitHubCloneService extends Service {
     private static final String CHANNEL_ID = "github_clone_channel";
